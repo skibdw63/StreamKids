@@ -21,66 +21,100 @@
     <div class="logo">StreamKids</div>
     <div class="nav-buttons">
       <button onclick="showTab('feed')">Home</button>
+      <button onclick="showTab('schedule')">Schedule</button>
       <button onclick="showTab('auth')" id="nav-auth-btn">Parent Login / Sign Up</button>
-      <button onclick="startMyStream()" class="go-live-btn">+ Go Live</button>
     </div>
   </nav>
 
   <!-- Main Content Container -->
   <main class="container">
 
-    <!-- TAB 1: Stream Feed & Viewer -->
+    <!-- TAB 1: Stream Feed, Live Chat, Viewer Count -->
     <section id="feed-tab" class="tab-content active">
       <h2>Live Stream Feed</h2>
       
       <div class="stream-controls" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
-        <input type="text" id="remote-peer-input" placeholder="Enter Streamer's Peer ID">
-        <button onclick="connectToStreamer()">Watch Stream</button>
-
-        <!-- Stop Stream Button -->
+        <input type="text" id="stream-title-input" placeholder="Your Stream Title">
+        <button onclick="startMyStream()" class="go-live-btn">+ Go Live</button>
         <button onclick="stopMyStream()" style="background-color: #e50914; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">Stop Stream</button>
 
-        <!-- Microphone Device Selector -->
+        <span style="color: #666;">|</span>
+
+        <input type="text" id="search-stream-input" placeholder="Search Stream Title">
+        <button onclick="searchAndWatchStream()">Watch Stream</button>
+
         <label for="mic-select" style="font-size: 14px; margin-left: 10px;">Microphone:</label>
-        <select id="mic-select" style="padding: 8px; border-radius: 4px; background-color: #121212; color: white; border: 1px solid #444;">
-          <option value="">Loading microphones...</option>
-        </select>
+        <select id="mic-select" style="padding: 8px; border-radius: 4px; background-color: #121212; color: white; border: 1px solid #444;"></select>
       </div>
 
-      <div class="video-grid">
-        <div class="video-card">
-          <h3>Your Camera (Streamer)</h3>
-          <p id="my-peer-id">Peer ID: Connecting...</p>
-          <video id="my-webcam" autoplay playsinline muted></video>
+      <!-- Viewer Counter Display -->
+      <div id="viewer-count-box" style="margin-bottom: 15px; font-weight: bold; color: #00ffcc;">
+        👁️ Live Viewers: <span id="viewer-count">0</span>
+      </div>
+
+      <div class="video-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+        <!-- Left: Video Streams -->
+        <div class="video-section">
+          <div class="video-card" style="margin-bottom: 15px;">
+            <h3>Your Camera (Streamer)</h3>
+            <p id="my-peer-id">Peer ID: Connecting...</p>
+            <video id="my-webcam" autoplay playsinline muted style="width: 100%; max-height: 300px; background: #000;"></video>
+          </div>
+
+          <div class="video-card">
+            <h3>Watching Stream</h3>
+            <video id="remote-webcam" autoplay playsinline controls style="width: 100%; max-height: 300px; background: #000;"></video>
+          </div>
         </div>
 
-        <div class="video-card">
-          <h3>Watching Stream</h3>
-          <video id="remote-webcam" autoplay playsinline controls></video>
+        <!-- Right: Live Chat Box -->
+        <div class="chat-section" style="background: #1e1e1e; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; height: 600px;">
+          <h3>Live Chat</h3>
+          <div id="chat-messages" style="flex: 1; overflow-y: auto; background: #121212; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+            <p style="color: #777;">Join a stream to start chatting...</p>
+          </div>
+          <div style="display: flex; gap: 5px;">
+            <input type="text" id="chat-input" placeholder="Type a message..." style="flex: 1; padding: 8px;">
+            <button onclick="sendChatMessage()">Send</button>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- TAB 2: Authentication & Parent Math Verification -->
+    <!-- TAB 2: Schedule Stream Section -->
+    <section id="schedule-tab" class="tab-content">
+      <h2>Scheduled Streams</h2>
+      
+      <div style="background: #1e1e1e; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <h3>Schedule a New Stream</h3>
+        <input type="text" id="sched-title" placeholder="Stream Title" style="margin-bottom: 10px; display: block; width: 100%; padding: 8px;">
+        <input type="datetime-local" id="sched-time" style="margin-bottom: 10px; display: block; width: 100%; padding: 8px; background: #121212; color: white; border: 1px solid #444;">
+        <button onclick="scheduleStream()">Save Schedule</button>
+      </div>
+
+      <h3>Upcoming Broadcasts</h3>
+      <div id="upcoming-streams-list" style="display: flex; flex-direction: column; gap: 10px;">
+        <p>Loading upcoming streams...</p>
+      </div>
+    </section>
+
+    <!-- TAB 3: Authentication & Parent Math Verification -->
     <section id="auth-tab" class="tab-content">
       <div class="auth-box">
         <h2>Parent Verification Gate</h2>
         <p>COPPA Compliance Test: Solve the equation to proceed.</p>
 
-        <!-- Parent Math Gate -->
         <div id="math-gate">
           <p id="math-question" class="math-problem"></p>
           <input type="number" id="math-answer" placeholder="Your Answer">
           <button onclick="verifyParentMath()">Verify Math Gate</button>
         </div>
 
-        <!-- Hidden Auth Form unlocked by Math Gate -->
         <div id="firebase-auth-form" class="hidden">
           <h3>Parent Account Registration</h3>
           <input type="email" id="auth-email" placeholder="Parent Email">
           <input type="password" id="auth-password" placeholder="Password">
           
-          <!-- Where Are You From Section -->
           <label for="user-country" style="display:block; margin: 10px 0 5px; font-size: 14px; text-align: left;">Where are you from?</label>
           <select id="user-country" style="width: 100%; padding: 10px; margin-bottom: 12px; background-color: #121212; border: 1px solid #444; color: white; border-radius: 4px;">
             <option value="">Select your country</option>
@@ -108,10 +142,13 @@
   <script src="js/auth.js"></script>
   <script src="js/stream.js"></script>
   <script>
-    // Tab Switching Logic
     function showTab(tabName) {
       document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
       if (tabName === 'feed') document.getElementById('feed-tab').classList.add('active');
+      if (tabName === 'schedule') {
+        document.getElementById('schedule-tab').classList.add('active');
+        loadScheduledStreams();
+      }
       if (tabName === 'auth') document.getElementById('auth-tab').classList.add('active');
     }
   </script>
