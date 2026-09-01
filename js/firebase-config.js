@@ -1,4 +1,4 @@
-// Firebase Initialization
+// Firebase Project Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDWLIkXikb_ZYAOZxzgI44GQTBJ8eRlW_Y",
   authDomain: "streamkids-app.firebaseapp.com",
@@ -8,6 +8,7 @@ const firebaseConfig = {
   appId: "1:410660159124:web:2555b51f99de7c60f9fe81"
 };
 
+// Initialize Firebase
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
