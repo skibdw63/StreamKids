@@ -1,6 +1,7 @@
-// Firebase Project Configuration
+// js/firebase-config.js
+
 const firebaseConfig = {
-  apiKey: "AIzaSyDWLiKXikb_ZYAOZxzgI44GQTbJ8eR1w_Y",
+  apiKey: "AIzaSyDWLIkXikb_ZYAOZxzgI44GQTbJ8eRlw_Y",
   authDomain: "streamkids-app.firebaseapp.com",
   projectId: "streamkids-app",
   storageBucket: "streamkids-app.firebasestorage.app",
@@ -13,10 +14,6 @@ if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
 
-// Attach directly to the global window object
-window.auth = firebase.auth();
+// Global scope references
 window.db = firebase.firestore();
-
-// Also export as standard global variables for direct access
-var auth = window.auth;
-var db = window.db;
+window.auth = firebase.auth();
