@@ -115,6 +115,7 @@ async function startMyStream() {
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
+    // Start listening to listeners and chat
     listenToChat(activeStreamTitle);
     listenToViewers(activeStreamTitle);
 
@@ -155,7 +156,7 @@ async function searchAndWatchStream() {
     activeStreamTitle = searchTitle;
     const targetPeerId = doc.data().peerId;
 
-    // Create viewer document inside the viewers subcollection
+    // 1. ADD VIEWER TO FIRESTORE FIRST
     const viewerRef = await dbInstance.collection('active_streams')
       .doc(searchTitle)
       .collection('viewers')
@@ -163,9 +164,14 @@ async function searchAndWatchStream() {
 
     currentViewerDocId = viewerRef.id;
 
-    // Start sending heartbeat pings every 5 seconds
+    // 2. Start heartbeat ping every 5s
     startHeartbeat(searchTitle, currentViewerDocId);
 
+    // 3. Listen to active count & chat
+    listenToChat(activeStreamTitle);
+    listenToViewers(activeStreamTitle);
+
+    // 4. Connect to Host via PeerJS Call
     await initPeer();
 
     const options = { constraints: { offerToReceiveAudio: true, offerToReceiveVideo: true } };
@@ -179,9 +185,6 @@ async function searchAndWatchStream() {
         remoteVideo.play().catch(console.error);
       }
     });
-
-    listenToChat(activeStreamTitle);
-    listenToViewers(activeStreamTitle);
 
   } catch (err) {
     console.error("Error connecting to stream:", err);
