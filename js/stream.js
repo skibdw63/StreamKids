@@ -1,7 +1,37 @@
 let peer = null;
 let localStream = null;
 
-// Initialize PeerJS with public STUN servers
+// Enumerate audio input devices and populate the dropdown menu
+async function getMicrophones() {
+  const micSelect = document.getElementById('mic-select');
+  if (!micSelect) return;
+
+  try {
+    // Request permission to list device labels correctly
+    await navigator.mediaDevices.getUserMedia({ audio: true });
+    
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const audioInputs = devices.filter(device => device.kind === 'audioinput');
+
+    micSelect.innerHTML = '';
+    audioInputs.forEach((device, index) => {
+      const option = document.createElement('option');
+      option.value = device.deviceId;
+      option.text = device.label || `Microphone ${index + 1}`;
+      
+      // Auto-select Camo Microphone if found
+      if (device.label.toLowerCase().includes('camo')) {
+        option.selected = true;
+      }
+
+      micSelect.appendChild(option);
+    });
+  } catch (err) {
+    console.error("Could not list audio devices:", err);
+  }
+}
+
+// Initialize PeerJS
 function initPeer() {
   if (peer) return;
 
@@ -22,9 +52,8 @@ function initPeer() {
     }
   });
 
-  // Handle incoming calls from viewers
+  // Handle incoming connections from viewers
   peer.on('call', (call) => {
-    // Answer call with streamer's camera and audio stream
     call.answer(localStream);
 
     call.on('stream', (remoteStream) => {
@@ -44,26 +73,39 @@ function initPeer() {
   });
 }
 
-// Start user's camera & microphone (Streamer Tab)
+// Start Streamer Camera & Selected Microphone
 function startMyStream() {
   showTab('feed');
 
-  navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+  const selectedMicId = document.getElementById('mic-select')?.value;
+
+  const constraints = {
+    video: true,
+    audio: selectedMicId ? { deviceId: { exact: selectedMicId } } : true
+  };
+
+  navigator.mediaDevices.getUserMedia(constraints)
     .then((stream) => {
       localStream = stream;
       const localVideo = document.getElementById('my-webcam');
       if (localVideo) {
         localVideo.srcObject = stream;
       }
+
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        console.log("Active microphone:", audioTrack.label);
+      }
+
       initPeer();
     })
     .catch((err) => {
-      alert("Unable to access camera/microphone. Please allow browser permissions.");
+      alert("Unable to access camera or microphone. Check permissions.");
       console.error(err);
     });
 }
 
-// Watch stream (Viewer Tab)
+// Connect Viewer to Streamer
 function connectToStreamer() {
   const targetId = document.getElementById('remote-peer-input').value.trim();
 
@@ -86,14 +128,11 @@ function connectToStreamer() {
   const call = peer.call(targetId, localStream || new MediaStream(), options);
 
   call.on('stream', (remoteStream) => {
-    console.log("Received streamer's media stream with audio tracks:", remoteStream.getAudioTracks());
     const remoteVideo = document.getElementById('remote-webcam');
     if (remoteVideo) {
       remoteVideo.srcObject = remoteStream;
-      remoteVideo.muted = false; // Unmute viewer video
-      remoteVideo.play().catch(err => {
-        console.log("Autoplay blocked by browser. User must click video to enable audio:", err);
-      });
+      remoteVideo.muted = false;
+      remoteVideo.play().catch(err => console.log("Autoplay blocked:", err));
     }
   });
 
@@ -103,7 +142,8 @@ function connectToStreamer() {
   });
 }
 
-// Initialize peer connection automatically on page load
+// Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+  getMicrophones();
   initPeer();
 });
