@@ -5,6 +5,17 @@ let activeStreamTitle = "";
 let chatUnsubscribe = null;
 let viewerUnsubscribe = null;
 let currentViewerDocId = null;
+let heartbeatInterval = null;
+
+// Helper to safely obtain the database instance
+function getDb() {
+  if (window.db) return window.db;
+  if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+    window.db = firebase.firestore();
+    return window.db;
+  }
+  return null;
+}
 
 // Enumerate connected microphones
 async function getMicrophones() {
@@ -75,6 +86,12 @@ async function startMyStream() {
     return;
   }
 
+  const dbInstance = getDb();
+  if (!dbInstance) {
+    alert("Database connection is not initialized.");
+    return;
+  }
+
   activeStreamTitle = streamTitle.toLowerCase();
   showTab('feed');
   const selectedMicId = document.getElementById('mic-select')?.value;
@@ -92,17 +109,14 @@ async function startMyStream() {
 
     const peerId = await initPeer();
 
-    if (window.db) {
-      await db.collection('active_streams').doc(activeStreamTitle).set({
-        title: streamTitle,
-        peerId: peerId,
-        viewers: 0,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
+    await dbInstance.collection('active_streams').doc(activeStreamTitle).set({
+      title: streamTitle,
+      peerId: peerId,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
 
-      listenToChat(activeStreamTitle);
-      listenToViewers(activeStreamTitle);
-    }
+    listenToChat(activeStreamTitle);
+    listenToViewers(activeStreamTitle);
 
     alert(`Stream "${streamTitle}" is live!`);
   } catch (err) {
@@ -121,37 +135,36 @@ async function searchAndWatchStream() {
     return;
   }
 
-  if (!window.db) {
+  const dbInstance = getDb();
+  if (!dbInstance) {
     alert("Database connection is not initialized.");
     return;
   }
 
   try {
-    const doc = await db.collection('active_streams').doc(searchTitle).get();
+    const doc = await dbInstance.collection('active_streams').doc(searchTitle).get();
 
     if (!doc.exists) {
       alert("No active stream found with that title!");
       return;
     }
 
-    // Leave any previously watched stream before connecting to a new one
+    // Clean up previous viewer session if switching streams
     await leaveCurrentStreamAsViewer();
 
     activeStreamTitle = searchTitle;
     const targetPeerId = doc.data().peerId;
 
-    // Track individual viewer session doc
-    const viewerRef = await db.collection('active_streams')
+    // Create viewer document with initial heartbeat timestamp
+    const viewerRef = await dbInstance.collection('active_streams')
       .doc(searchTitle)
       .collection('viewers')
-      .add({ joinedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      .add({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() });
 
     currentViewerDocId = viewerRef.id;
 
-    // Increment live viewer counter (+1)
-    await db.collection('active_streams').doc(searchTitle).update({
-      viewers: firebase.firestore.FieldValue.increment(1)
-    });
+    // Start sending heartbeat pings every 5 seconds
+    startHeartbeat(searchTitle, currentViewerDocId);
 
     await initPeer();
 
@@ -175,38 +188,60 @@ async function searchAndWatchStream() {
   }
 }
 
-// Decrement viewer counter when a viewer leaves or closes tab (-1)
-async function leaveCurrentStreamAsViewer() {
-  if (activeStreamTitle && currentViewerDocId && window.db) {
-    const streamRef = db.collection('active_streams').doc(activeStreamTitle);
+// Heartbeat Ping (updates every 5 seconds)
+function startHeartbeat(streamTitle, viewerId) {
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
 
-    // Delete viewer tracking doc
-    await streamRef.collection('viewers').doc(currentViewerDocId).delete().catch(console.error);
-
-    // Decrement main viewer counter safely using transaction
-    await db.runTransaction(async (transaction) => {
-      const sfDoc = await transaction.get(streamRef);
-      if (sfDoc.exists) {
-        const newCount = Math.max(0, (sfDoc.data().viewers || 1) - 1);
-        transaction.update(streamRef, { viewers: newCount });
+  heartbeatInterval = setInterval(async () => {
+    const dbInstance = getDb();
+    if (activeStreamTitle && currentViewerDocId && dbInstance) {
+      try {
+        await dbInstance.collection('active_streams')
+          .doc(streamTitle)
+          .collection('viewers')
+          .doc(viewerId)
+          .set({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      } catch (err) {
+        console.error("Heartbeat ping error:", err);
       }
-    }).catch(console.error);
+    }
+  }, 5000);
+}
 
+// Stop Heartbeat & Leave Stream
+async function leaveCurrentStreamAsViewer() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+
+  const dbInstance = getDb();
+  if (activeStreamTitle && currentViewerDocId && dbInstance) {
+    const streamTitle = activeStreamTitle;
+    const viewerId = currentViewerDocId;
     currentViewerDocId = null;
+
+    await dbInstance.collection('active_streams')
+      .doc(streamTitle)
+      .collection('viewers')
+      .doc(viewerId)
+      .delete()
+      .catch(console.error);
   }
 }
 
-// Automatically decrement viewer count if window/tab closes
+// Window Unload Fallback
 window.addEventListener('beforeunload', () => {
   leaveCurrentStreamAsViewer();
 });
 
-// Stop Stream Function (Host/Viewer Reset)
+// Stop Stream Function
 async function stopMyStream() {
   await leaveCurrentStreamAsViewer();
 
-  if (activeStreamTitle && window.db) {
-    db.collection('active_streams').doc(activeStreamTitle).delete().catch(console.error);
+  const dbInstance = getDb();
+  if (activeStreamTitle && dbInstance) {
+    dbInstance.collection('active_streams').doc(activeStreamTitle).delete().catch(console.error);
   }
 
   if (localStream) {
@@ -232,14 +267,50 @@ async function stopMyStream() {
   console.log("Stream stopped.");
 }
 
+// Real-Time Viewer Count Listener with Stale Session Removal
+function listenToViewers(streamTitle) {
+  const dbInstance = getDb();
+  if (!dbInstance) return;
+
+  if (viewerUnsubscribe) viewerUnsubscribe();
+
+  viewerUnsubscribe = dbInstance.collection('active_streams')
+    .doc(streamTitle)
+    .collection('viewers')
+    .onSnapshot((snapshot) => {
+      const now = Date.now();
+      let activeCount = 0;
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.lastSeen) {
+          const lastSeenTime = data.lastSeen.toDate ? data.lastSeen.toDate().getTime() : now;
+          // Count sessions that updated within the last 12 seconds
+          if (now - lastSeenTime < 12000) {
+            activeCount++;
+          } else {
+            // Delete abandoned session documents
+            doc.ref.delete().catch(() => {});
+          }
+        } else {
+          activeCount++;
+        }
+      });
+
+      const vCount = document.getElementById('viewer-count');
+      if (vCount) vCount.innerText = activeCount;
+    });
+}
+
 // Real-Time Chat Listener
 function listenToChat(streamTitle) {
   const chatContainer = document.getElementById('chat-messages');
-  if (!chatContainer || !window.db) return;
+  const dbInstance = getDb();
+  if (!chatContainer || !dbInstance) return;
 
   if (chatUnsubscribe) chatUnsubscribe();
 
-  chatUnsubscribe = db.collection('active_streams')
+  chatUnsubscribe = dbInstance.collection('active_streams')
     .doc(streamTitle)
     .collection('chat')
     .orderBy('timestamp', 'asc')
@@ -271,8 +342,9 @@ async function sendChatMessage() {
     return;
   }
 
-  if (!window.db) {
-    alert("Database is not connected.");
+  const dbInstance = getDb();
+  if (!dbInstance) {
+    alert("Database connection is not initialized.");
     return;
   }
 
@@ -280,7 +352,7 @@ async function sendChatMessage() {
     const user = window.auth ? auth.currentUser : null;
     const senderName = user && user.email ? user.email.split('@')[0] : "Guest Viewer";
 
-    await db.collection('active_streams')
+    await dbInstance.collection('active_streams')
       .doc(activeStreamTitle)
       .collection('chat')
       .add({
@@ -296,22 +368,6 @@ async function sendChatMessage() {
   }
 }
 
-// Real-Time Viewer Count Listener
-function listenToViewers(streamTitle) {
-  if (!window.db) return;
-  if (viewerUnsubscribe) viewerUnsubscribe();
-
-  viewerUnsubscribe = db.collection('active_streams')
-    .doc(streamTitle)
-    .onSnapshot((doc) => {
-      if (doc.exists) {
-        const count = doc.data().viewers || 0;
-        const vCount = document.getElementById('viewer-count');
-        if (vCount) vCount.innerText = count;
-      }
-    });
-}
-
 // Schedule Stream Function
 async function scheduleStream() {
   const title = document.getElementById('sched-title')?.value.trim();
@@ -322,13 +378,14 @@ async function scheduleStream() {
     return;
   }
 
-  if (!window.db) {
-    alert("Database is not connected.");
+  const dbInstance = getDb();
+  if (!dbInstance) {
+    alert("Database connection is not initialized.");
     return;
   }
 
   try {
-    await db.collection('scheduled_streams').add({
+    await dbInstance.collection('scheduled_streams').add({
       title: title,
       scheduledTime: time,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -347,12 +404,13 @@ async function scheduleStream() {
 // Load Scheduled Broadcasts
 async function loadScheduledStreams() {
   const listEl = document.getElementById('upcoming-streams-list');
-  if (!listEl || !window.db) return;
+  const dbInstance = getDb();
+  if (!listEl || !dbInstance) return;
 
   listEl.innerHTML = 'Loading...';
 
   try {
-    const snapshot = await db.collection('scheduled_streams').orderBy('scheduledTime', 'asc').get();
+    const snapshot = await dbInstance.collection('scheduled_streams').orderBy('scheduledTime', 'asc').get();
 
     if (snapshot.empty) {
       listEl.innerHTML = '<p style="color: #aaa;">No upcoming streams scheduled yet.</p>';
