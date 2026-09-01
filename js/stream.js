@@ -1,7 +1,7 @@
 let peer = null;
 let localStream = null;
 
-// Initialize PeerJS with public STUN servers for network connections
+// Initialize PeerJS with public STUN servers
 function initPeer() {
   if (peer) return;
 
@@ -24,7 +24,7 @@ function initPeer() {
 
   // Handle incoming calls from viewers
   peer.on('call', (call) => {
-    // Send local camera stream back to viewer
+    // Answer call with streamer's camera and audio stream
     call.answer(localStream);
 
     call.on('stream', (remoteStream) => {
@@ -44,7 +44,7 @@ function initPeer() {
   });
 }
 
-// Start user's camera (Streamer Tab)
+// Start user's camera & microphone (Streamer Tab)
 function startMyStream() {
   showTab('feed');
 
@@ -76,7 +76,6 @@ function connectToStreamer() {
     initPeer();
   }
 
-  // Create empty audio/video track constraints if user isn't streaming back
   const options = {
     constraints: {
       offerToReceiveAudio: true,
@@ -84,15 +83,17 @@ function connectToStreamer() {
     }
   };
 
-  // Call the streamer with local stream or dummy constraints
   const call = peer.call(targetId, localStream || new MediaStream(), options);
 
   call.on('stream', (remoteStream) => {
-    console.log("Received streamer's media stream!");
+    console.log("Received streamer's media stream with audio tracks:", remoteStream.getAudioTracks());
     const remoteVideo = document.getElementById('remote-webcam');
     if (remoteVideo) {
       remoteVideo.srcObject = remoteStream;
-      remoteVideo.play();
+      remoteVideo.muted = false; // Unmute viewer video
+      remoteVideo.play().catch(err => {
+        console.log("Autoplay blocked by browser. User must click video to enable audio:", err);
+      });
     }
   });
 
