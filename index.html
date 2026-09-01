@@ -71,6 +71,18 @@
           <input type="email" id="auth-email" placeholder="Parent Email">
           <input type="password" id="auth-password" placeholder="Password">
           
+          <!-- Where Are You From Section -->
+          <label for="user-country" style="display:block; margin: 10px 0 5px; font-size: 14px; text-align: left;">Where are you from?</label>
+          <select id="user-country" style="width: 100%; padding: 10px; margin-bottom: 12px; background-color: #121212; border: 1px solid #444; color: white; border-radius: 4px;">
+            <option value="">Select your country</option>
+            <option value="US">United States</option>
+            <option value="CA">Canada</option>
+            <option value="MX">Mexico</option>
+            <option value="UK">United Kingdom</option>
+            <option value="ES">Spain</option>
+            <option value="Other">Other</option>
+          </select>
+
           <div class="auth-actions">
             <button onclick="handleSignUp()">Parent Sign Up</button>
             <button onclick="handleLogin()">Parent Log In</button>
