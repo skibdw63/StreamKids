@@ -155,7 +155,7 @@ async function searchAndWatchStream() {
     activeStreamTitle = searchTitle;
     const targetPeerId = doc.data().peerId;
 
-    // Create viewer document with initial heartbeat timestamp
+    // Create viewer document inside the viewers subcollection
     const viewerRef = await dbInstance.collection('active_streams')
       .doc(searchTitle)
       .collection('viewers')
@@ -267,7 +267,7 @@ async function stopMyStream() {
   console.log("Stream stopped.");
 }
 
-// Real-Time Viewer Count Listener with Stale Session Removal
+// Real-Time Viewer Count Listener (Listens to the viewers subcollection)
 function listenToViewers(streamTitle) {
   const dbInstance = getDb();
   if (!dbInstance) return;
@@ -285,11 +285,11 @@ function listenToViewers(streamTitle) {
         const data = doc.data();
         if (data.lastSeen) {
           const lastSeenTime = data.lastSeen.toDate ? data.lastSeen.toDate().getTime() : now;
-          // Count sessions that updated within the last 12 seconds
+          // Count active sessions that sent a heartbeat within the last 12 seconds
           if (now - lastSeenTime < 12000) {
             activeCount++;
           } else {
-            // Delete abandoned session documents
+            // Automatically clean up stale documents from closed tabs
             doc.ref.delete().catch(() => {});
           }
         } else {
@@ -299,6 +299,8 @@ function listenToViewers(streamTitle) {
 
       const vCount = document.getElementById('viewer-count');
       if (vCount) vCount.innerText = activeCount;
+    }, (error) => {
+      console.error("Viewer listener error:", error);
     });
 }
 
