@@ -3,97 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StreamKids</title>
-
-  <!-- External Stylesheet -->
+  <title>StreamKids - Live Streaming</title>
   <link rel="stylesheet" href="styles.css">
 
-  <!-- Firebase & PeerJS Libraries -->
+  <!-- Firebase Compatibility SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <!-- PeerJS CDN -->
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
 
-  <!-- Top Navbar -->
-  <div class="navbar">
-    <div class="logo">🔴 StreamKids</div>
-    <div>
-      <button class="btn btn-red" onclick="startMyStream()">+ Go Live</button>
-      <button class="btn btn-blue" onclick="openSignup()">Parent Sign Up</button>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="logo">StreamKids</div>
+    <div class="nav-buttons">
+      <button onclick="showTab('feed')">Home</button>
+      <button onclick="showTab('auth')" id="nav-auth-btn">Parent Login / Sign Up</button>
+      <button onclick="startMyStream()" class="go-live-btn">+ Go Live</button>
     </div>
-  </div>
+  </nav>
 
-  <div class="container">
-    <!-- Sidebar -->
-    <div class="sidebar">
-      <div class="menu-item active" onclick="showTab('feed')">🏠 Live Streams</div>
-      <div class="menu-item" onclick="showTab('dashboard')">📊 Dashboard</div>
-      <div class="menu-item" onclick="showTab('gate')">🌐 Country / Gate</div>
-    </div>
+  <!-- Main Content Container -->
+  <main class="container">
 
-    <div class="main-content">
-      <!-- Gate Tab -->
-      <div id="section-gate">
-        <div class="modal">
-          <h2>Select Country</h2>
-          <button class="btn btn-blue" onclick="selectCountry('USA')">USA 🇺🇸</button>
-          <button class="btn btn-green" onclick="selectCountry('Mexico')">Mexico 🇲🇽</button>
-          <button class="btn btn-red" onclick="selectCountry('Canada')">Canada 🇨🇦</button>
-        </div>
-
-        <div id="math-gate" class="modal" style="display: none;">
-          <h2>Parent Math Verification</h2>
-          <p id="math-question">Loading...</p>
-          <input type="number" id="math-answer" placeholder="Answer">
-          <br>
-          <button class="btn btn-green" onclick="checkMath()">Verify Parent</button>
-        </div>
+    <!-- TAB 1: Stream Feed & Viewer -->
+    <section id="feed-tab" class="tab-content active">
+      <h2>Live Stream Feed</h2>
+      
+      <div class="stream-controls">
+        <input type="text" id="remote-peer-input" placeholder="Enter Streamer's Peer ID">
+        <button onclick="connectToStreamer()">Watch Stream</button>
       </div>
 
-      <!-- Feed Tab -->
-      <div id="section-feed" style="display: none;">
-        <h2>Active Live Broadcasts</h2>
-        <div class="grid" id="stream-grid">
-          <div class="video-card">
-            <video id="my-webcam" autoplay playsinline muted></video>
-            <div style="margin-top: 8px; font-weight: bold;">Your Live Stream Feed</div>
-            <div id="my-peer-id" style="font-size: 12px; color: #aaa;">Peer ID: Off</div>
+      <div class="video-grid">
+        <div class="video-card">
+          <h3>Your Camera (Streamer)</h3>
+          <p id="my-peer-id">Peer ID: Connecting...</p>
+          <video id="my-webcam" autoplay playsinline muted></video>
+        </div>
+
+        <div class="video-card">
+          <h3>Watching Stream</h3>
+          <video id="remote-webcam" autoplay playsinline></video>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: Authentication & Parent Math Verification -->
+    <section id="auth-tab" class="tab-content">
+      <div class="auth-box">
+        <h2>Parent Verification Gate</h2>
+        <p>COPPA Compliance Test: Solve the equation to proceed.</p>
+
+        <!-- Parent Math Gate -->
+        <div id="math-gate">
+          <p id="math-question" class="math-problem"></p>
+          <input type="number" id="math-answer" placeholder="Your Answer">
+          <button onclick="verifyParentMath()">Verify Math Gate</button>
+        </div>
+
+        <!-- Hidden Auth Form unlocked by Math Gate -->
+        <div id="firebase-auth-form" class="hidden">
+          <h3>Parent Account Registration</h3>
+          <input type="email" id="auth-email" placeholder="Parent Email">
+          <input type="password" id="auth-password" placeholder="Password">
+          
+          <div class="auth-actions">
+            <button onclick="handleSignUp()">Parent Sign Up</button>
+            <button onclick="handleLogin()">Parent Log In</button>
           </div>
-          <div class="video-card">
-            <video id="remote-webcam" autoplay playsinline></video>
-            <div style="margin-top: 8px; font-weight: bold;">Watched Remote Stream</div>
-            <input type="text" id="remote-peer-input" placeholder="Enter Streamer Peer ID" style="width: 70%;">
-            <button class="btn btn-blue" onclick="connectToStreamer()">Watch</button>
-          </div>
+          <p id="auth-status" class="status-msg"></p>
         </div>
       </div>
+    </section>
 
-      <!-- Dashboard Tab -->
-      <div id="section-dashboard" style="display: none;">
-        <h2>Creator Dashboard</h2>
-        <div class="grid">
-          <div class="video-card"><h3>Views</h3><p style="font-size: 24px; color: #4caf50;">0</p></div>
-          <div class="video-card"><h3>Parent Status</h3><p id="stat-status" style="font-size: 18px; color: #ff9800;">Pending Verification</p></div>
-        </div>
-      </div>
+  </main>
 
-      <!-- Sign Up Modal -->
-      <div id="signup-modal" class="modal" style="display: none;">
-        <h2>Parent & Creator Registration</h2>
-        <input type="email" id="parent-email" placeholder="Parent Email">
-        <input type="password" id="parent-pass" placeholder="Password">
-        <br>
-        <button class="btn btn-blue" onclick="registerUser()">Register Account</button>
-        <button class="btn" style="background: #444;" onclick="closeSignup()">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Custom External JavaScript Files -->
+  <!-- App Scripts -->
   <script src="js/firebase-config.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/stream.js"></script>
+  <script>
+    // Tab Switching Logic
+    function showTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      if (tabName === 'feed') document.getElementById('feed-tab').classList.add('active');
+      if (tabName === 'auth') document.getElementById('auth-tab').classList.add('active');
+    }
+  </script>
 </body>
 </html>
