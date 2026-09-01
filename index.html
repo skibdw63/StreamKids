@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StreamKids by Alan Rivera</title>
+  
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+  <!-- PeerJS CDN for $0 Peer-to-Peer Streaming -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      transition: background-color 0.5s ease;
+      color: white;
+      margin: 0;
+      padding: 20px;
+      background-color: #1a1a1a;
+    }
+    .card {
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(8px);
+      padding: 25px;
+      border-radius: 16px;
+      max-width: 600px;
+      margin: 20px auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .btn {
+      padding: 14px 28px;
+      font-size: 16px;
+      margin: 8px;
+      cursor: pointer;
+      border: none;
+      border-radius: 10px;
+      font-weight: bold;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    .btn:hover {
+      transform: scale(1.04);
+      opacity: 0.9;
+    }
+    input {
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      width: 80%;
+      max-width: 300px;
+      margin-bottom: 12px;
+    }
+    video {
+      width: 100%;
+      border-radius: 12px;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>StreamKids 🚀</h1>
+  <p>The safe streaming app built by Alan Rivera</p>
+
+  <!-- STEP 1: Country Selection Screen -->
+  <div id="country-screen" class="card">
+    <h2>Where are you from?</h2>
+    <p>Select your country to get started:</p>
+    <button class="btn" style="background: #002868; color: white;" onclick="selectCountry('USA')">USA 🇺🇸</button>
+    <button class="btn" style="background: #006847; color: white;" onclick="selectCountry('Mexico')">Mexico 🇲🇽</button>
+    <button class="btn" style="background: #FF0000; color: white;" onclick="selectCountry('Canada')">Canada 🇨🇦</button>
+  </div>
+
+  <!-- STEP 2: Parent Math Gate -->
+  <div id="math-gate" class="card" style="display: none;">
+    <h2>Ask a Parent to Pass the Gate</h2>
+    <p id="math-question">Loading math problem...</p>
+    <input type="number" id="math-answer" placeholder="Enter answer">
+    <br>
+    <button class="btn" style="background: #28a745; color: white;" onclick="checkMath()">Verify Parent</button>
+  </div>
+
+  <!-- STEP 3: Onboarding Screen (Video or Transcript) -->
+  <div id="onboarding-screen" class="card" style="display: none;">
+    
+    <!-- USA Video Player -->
+    <div id="usa-video-box" style="display: none;">
+      <h2>Message from Alan Rivera</h2>
+      <video controls poster="https://via.placeholder.com/600x340?text=StreamKids+Intro+Video">
+        <source src="YOUR_UPLOADED_VIDEO_URL.mp4" type="video/mp4">
+        Your browser does not support HTML video.
+      </video>
+    </div>
+
+    <!-- Mexico / Canada Transcript Box -->
+    <div id="transcript-box" style="display: none; text-align: left;">
+      <h2 id="transcript-title">Message from Creator</h2>
+      <p id="transcript-text" style="line-height: 1.6; font-size: 15px;"></p>
+    </div>
+
+    <br>
+    <button class="btn" style="background: #008CBA; color: white;" onclick="showStreamHub()">Continue to Sign Up</button>
+  </div>
+
+  <!-- STEP 4: Live Stream Hub -->
+  <div id="stream-hub" class="card" style="display: none;">
+    <h2>Live Stream Hub</h2>
+    <p>Watch streams or launch your own webcam broadcast!</p>
+    
+    <button class="btn" style="background: #e74c3c; color: white;" onclick="startMyStream()">Go Live 🔴</button>
+    
+    <h3>My Camera Feed:</h3>
+    <video id="my-webcam" autoplay playsinline muted></video>
+
+    <h3>Watching Stream:</h3>
+    <video id="remote-stream" autoplay playsinline></video>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // Firebase Setup
+    // -------------------------------------------------------------
+    const firebaseConfig = {
+      apiKey: "YOUR_FIREBASE_API_KEY",
+      authDomain: "streamkids-app.firebaseapp.com",
+      projectId: "streamkids-app",
+      storageBucket: "streamkids-app.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:abcdef123456"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+
+    // -------------------------------------------------------------
+    // App Logic & Country Themes
+    // -------------------------------------------------------------
+    let currentCountry = "";
+    let num1, num2, correctAnswer;
+    let peer, localStream;
+
+    function selectCountry(country) {
+      currentCountry = country;
+
+      if (country === 'USA') {
+        document.body.style.backgroundColor = '#002868';
+      } else if (country === 'Mexico') {
+        document.body.style.backgroundColor = '#006847';
+      } else if (country === 'Canada') {
+        document.body.style.backgroundColor = '#D80003';
+      }
+
+      num1 = Math.floor(Math.random() * 85) + 12;
+      num2 = Math.floor(Math.random() * 8) + 2;
+      correctAnswer = num1 * num2;
+
+      document.getElementById('math-question').innerText = `Parents: What is ${num1} × ${num2}?`;
+      document.getElementById('country-screen').style.display = 'none';
+      document.getElementById('math-gate').style.display = 'block';
+    }
+
+    function checkMath() {
+      let userAnswer = parseInt(document.getElementById('math-answer').value);
+      if (userAnswer === correctAnswer) {
+        document.getElementById('math-gate').style.display = 'none';
+        document.getElementById('onboarding-screen').style.display = 'block';
+
+        if (currentCountry === 'USA') {
+          document.getElementById('usa-video-box').style.display = 'block';
+        } else if (currentCountry === 'Mexico') {
+          document.getElementById('transcript-box').style.display = 'block';
+          document.getElementById('transcript-title').innerText = "Mensaje del Creador (Alan Rivera)";
+          document.getElementById('transcript-text').innerText = "¡Hola! Mi nombre es Alan Rivera y soy el creador de StreamKids. Creé esta plataforma para que los niños tengan un lugar divertido y seguro para hacer transmisiones en vivo. Para cumplir con las leyes como la LFPDPPP, necesitamos la autorización de tus padres antes de habilitar tu cuenta.";
+        } else if (currentCountry === 'Canada') {
+          document.getElementById('transcript-box').style.display = 'block';
+          document.getElementById('transcript-title').innerText = "Message from the Creator (Alan Rivera)";
+          document.getElementById('transcript-text').innerText = "Hi! My name is Alan Rivera and I am the creator of StreamKids. I built this platform so kids have a fun, safe place to share video clips and livestream. To comply with Canadian PIPEDA rules, parent permission is required.";
+        }
+      } else {
+        alert("Incorrect answer. Please ask a parent for help.");
+      }
+    }
+
+    function showStreamHub() {
+      document.getElementById('onboarding-screen').style.display = 'none';
+      document.getElementById('stream-hub').style.display = 'block';
+      initPeerJS();
+    }
+
+    // -------------------------------------------------------------
+    // PeerJS Setup
+    // -------------------------------------------------------------
+    function initPeerJS() {
+      peer = new Peer();
+
+      peer.on('open', (id) => {
+        console.log("Connected with Peer ID: " + id);
+      });
+
+      peer.on('call', (call) => {
+        call.answer(localStream);
+        call.on('stream', (remoteStream) => {
+          document.getElementById('remote-stream').srcObject = remoteStream;
+        });
+      });
+    }
+
+    function startMyStream() {
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then((stream) => {
+          localStream = stream;
+          document.getElementById('my-webcam').srcObject = stream;
+          alert("Your camera is live!");
+        })
+        .catch((err) => {
+          console.error("Camera access error: ", err);
+          alert("Could not access webcam. Please check permissions.");
+        });
+    }
+  </script>
+</body>
+</html>
