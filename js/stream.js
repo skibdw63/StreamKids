@@ -7,7 +7,6 @@ async function getMicrophones() {
   if (!micSelect) return;
 
   try {
-    // Request permission to list device labels correctly
     await navigator.mediaDevices.getUserMedia({ audio: true });
     
     const devices = await navigator.mediaDevices.enumerateDevices();
@@ -19,7 +18,6 @@ async function getMicrophones() {
       option.value = device.deviceId;
       option.text = device.label || `Microphone ${index + 1}`;
       
-      // Auto-select Camo Microphone if found
       if (device.label.toLowerCase().includes('camo')) {
         option.selected = true;
       }
@@ -31,7 +29,7 @@ async function getMicrophones() {
   }
 }
 
-// Initialize PeerJS
+// Initialize PeerJS connection
 function initPeer() {
   if (peer) return;
 
@@ -52,7 +50,6 @@ function initPeer() {
     }
   });
 
-  // Handle incoming connections from viewers
   peer.on('call', (call) => {
     call.answer(localStream);
 
@@ -103,6 +100,31 @@ function startMyStream() {
       alert("Unable to access camera or microphone. Check permissions.");
       console.error(err);
     });
+}
+
+// Stop Streamer Camera & Release Tracks
+function stopMyStream() {
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+
+  const localVideo = document.getElementById('my-webcam');
+  if (localVideo) {
+    localVideo.srcObject = null;
+  }
+
+  const peerDisplay = document.getElementById('my-peer-id');
+  if (peerDisplay) {
+    peerDisplay.innerText = "Peer ID: Disconnected";
+  }
+
+  if (peer) {
+    peer.destroy();
+    peer = null;
+  }
+
+  console.log("Stream stopped successfully.");
 }
 
 // Connect Viewer to Streamer
