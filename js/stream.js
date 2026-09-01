@@ -115,7 +115,6 @@ async function startMyStream() {
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    // Start listening to listeners and chat
     listenToChat(activeStreamTitle);
     listenToViewers(activeStreamTitle);
 
@@ -150,13 +149,12 @@ async function searchAndWatchStream() {
       return;
     }
 
-    // Clean up previous viewer session if switching streams
     await leaveCurrentStreamAsViewer();
 
     activeStreamTitle = searchTitle;
     const targetPeerId = doc.data().peerId;
 
-    // 1. ADD VIEWER TO FIRESTORE FIRST
+    // 1. Add viewer to Firestore BEFORE initializing PeerJS connection
     const viewerRef = await dbInstance.collection('active_streams')
       .doc(searchTitle)
       .collection('viewers')
@@ -164,10 +162,10 @@ async function searchAndWatchStream() {
 
     currentViewerDocId = viewerRef.id;
 
-    // 2. Start heartbeat ping every 5s
+    // 2. Start heartbeat pings
     startHeartbeat(searchTitle, currentViewerDocId);
 
-    // 3. Listen to active count & chat
+    // 3. Listen to count & chat immediately
     listenToChat(activeStreamTitle);
     listenToViewers(activeStreamTitle);
 
@@ -270,7 +268,7 @@ async function stopMyStream() {
   console.log("Stream stopped.");
 }
 
-// Real-Time Viewer Count Listener (Listens to the viewers subcollection)
+// Real-Time Viewer Count Listener (Handles pending server timestamps safely)
 function listenToViewers(streamTitle) {
   const dbInstance = getDb();
   if (!dbInstance) return;
@@ -286,17 +284,26 @@ function listenToViewers(streamTitle) {
 
       snapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.lastSeen) {
-          const lastSeenTime = data.lastSeen.toDate ? data.lastSeen.toDate().getTime() : now;
-          // Count active sessions that sent a heartbeat within the last 12 seconds
-          if (now - lastSeenTime < 12000) {
-            activeCount++;
-          } else {
-            // Automatically clean up stale documents from closed tabs
-            doc.ref.delete().catch(() => {});
-          }
-        } else {
+
+        // 1. Pending local write from serverTimestamp()
+        if (!data.lastSeen) {
           activeCount++;
+          return;
+        }
+
+        // 2. Parse timestamp safely
+        let lastSeenTime = now;
+        if (typeof data.lastSeen.toMillis === 'function') {
+          lastSeenTime = data.lastSeen.toMillis();
+        } else if (typeof data.lastSeen.toDate === 'function') {
+          lastSeenTime = data.lastSeen.toDate().getTime();
+        }
+
+        // 3. Count active sessions within 12s window
+        if (now - lastSeenTime < 12000) {
+          activeCount++;
+        } else {
+          doc.ref.delete().catch(() => {});
         }
       });
 
