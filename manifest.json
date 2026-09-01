@@ -7,12 +7,12 @@
   "theme_color": "#121212",
   "icons": [
     {
-      "src": "https://via.placeholder.com/192/00ffcc/121212?text=SK",
+      "src": "apppicture.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://via.placeholder.com/512/00ffcc/121212?text=StreamKids",
+      "src": "",
       "sizes": "512x512",
       "type": "image/png"
     }
