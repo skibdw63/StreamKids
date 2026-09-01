@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StreamKids - Live Streaming</title>
+  
+  <!-- Web App Manifest for Desktop Installation -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#121212">
+
   <link rel="stylesheet" href="styles.css">
 
   <!-- Firebase Compatibility SDKs -->
@@ -145,7 +150,15 @@
   <script src="js/firebase-config.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/stream.js"></script>
+  
+  <!-- Service Worker Registration for Desktop App Installation -->
   <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('Service Worker Registered'))
+        .catch(err => console.log('Service Worker Failure:', err));
+    }
+
     // Tab Display Handler
     function showTab(tabName) {
       document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
