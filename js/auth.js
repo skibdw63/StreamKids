@@ -1,51 +1,71 @@
-let num1, num2, correctAnswer;
+let targetMathAnswer = 0;
 
-function showTab(tab) {
-  document.getElementById('section-gate').style.display = 'none';
-  document.getElementById('section-feed').style.display = 'none';
-  document.getElementById('section-dashboard').style.display = 'none';
-  document.getElementById('section-' + tab).style.display = 'block';
-}
-
-function selectCountry(country) {
-  num1 = Math.floor(Math.random() * 80) + 12;
-  num2 = Math.floor(Math.random() * 8) + 2;
-  correctAnswer = num1 * num2;
-  document.getElementById('math-question').innerText = `Parents: What is ${num1} × ${num2}?`;
-  document.getElementById('math-gate').style.display = 'block';
-}
-
-function checkMath() {
-  if (parseInt(document.getElementById('math-answer').value) === correctAnswer) {
-    document.getElementById('stat-status').innerText = "Verified Parent ✅";
-    document.getElementById('stat-status').style.color = "#4caf50";
-    alert("Parent verified!");
-    showTab('feed');
-  } else {
-    alert("Incorrect answer.");
+// Generate Math Gate Problem
+function generateMathGate() {
+  const num1 = Math.floor(Math.random() * 20) + 5;
+  const num2 = Math.floor(Math.random() * 20) + 5;
+  targetMathAnswer = num1 * num2;
+  
+  const questionEl = document.getElementById('math-question');
+  if (questionEl) {
+    questionEl.innerText = `What is ${num1} × ${num2}?`;
   }
 }
 
-function openSignup() { document.getElementById('signup-modal').style.display = 'block'; }
-function closeSignup() { document.getElementById('signup-modal').style.display = 'none'; }
+// Verify Math Gate Result
+function verifyParentMath() {
+  const inputEl = document.getElementById('math-answer');
+  const userAns = parseInt(inputEl.value, 10);
 
-function registerUser() {
-  const email = document.getElementById('parent-email').value;
-  const pass = document.getElementById('parent-pass').value;
+  if (userAns === targetMathAnswer) {
+    document.getElementById('math-gate').classList.add('hidden');
+    document.getElementById('firebase-auth-form').classList.remove('hidden');
+  } else {
+    alert("Incorrect answer. Please try again.");
+    generateMathGate();
+  }
+}
 
-  auth.createUserWithEmailAndPassword(email, pass)
+// Parent Registration
+function handleSignUp() {
+  const email = document.getElementById('auth-email').value;
+  const password = document.getElementById('auth-password').value;
+  const statusEl = document.getElementById('auth-status');
+
+  auth.createUserWithEmailAndPassword(email, password)
     .then((userCredential) => {
-      return db.collection("users").doc(userCredential.user.uid).set({
-        parent_email: email,
-        parent_consented: true,
-        created_at: firebase.firestore.FieldValue.serverTimestamp()
+      return db.collection('users').doc(userCredential.user.uid).set({
+        email: email,
+        parentConsentVerified: true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     })
     .then(() => {
-      alert("Account created and saved in Firebase!");
-      closeSignup();
+      statusEl.style.color = 'green';
+      statusEl.innerText = 'Parent Account successfully created and verified!';
     })
-    .catch((err) => {
-      alert("Error: " + err.message);
+    .catch((error) => {
+      statusEl.style.color = 'red';
+      statusEl.innerText = error.message;
     });
 }
+
+// Parent Login
+function handleLogin() {
+  const email = document.getElementById('auth-email').value;
+  const password = document.getElementById('auth-password').value;
+  const statusEl = document.getElementById('auth-status');
+
+  auth.signInWithEmailAndPassword(email, password)
+    .then(() => {
+      statusEl.style.color = 'green';
+      statusEl.innerText = 'Logged in successfully!';
+    })
+    .catch((error) => {
+      statusEl.style.color = 'red';
+      statusEl.innerText = error.message;
+    });
+}
+
+// Run math problem setup on startup
+document.addEventListener('DOMContentLoaded', generateMathGate);
