@@ -30,12 +30,27 @@ function verifyParentMath() {
 function handleSignUp() {
   const email = document.getElementById('auth-email').value;
   const password = document.getElementById('auth-password').value;
+  const country = document.getElementById('user-country').value;
   const statusEl = document.getElementById('auth-status');
+
+  if (!email || !password) {
+    statusEl.style.color = 'red';
+    statusEl.innerText = 'Please provide both email and password.';
+    return;
+  }
+
+  if (!country) {
+    statusEl.style.color = 'red';
+    statusEl.innerText = 'Please select where you are from!';
+    return;
+  }
 
   auth.createUserWithEmailAndPassword(email, password)
     .then((userCredential) => {
+      // Save country location alongside parent verification in Firestore
       return db.collection('users').doc(userCredential.user.uid).set({
         email: email,
+        country: country,
         parentConsentVerified: true,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -55,6 +70,12 @@ function handleLogin() {
   const email = document.getElementById('auth-email').value;
   const password = document.getElementById('auth-password').value;
   const statusEl = document.getElementById('auth-status');
+
+  if (!email || !password) {
+    statusEl.style.color = 'red';
+    statusEl.innerText = 'Please enter your email and password.';
+    return;
+  }
 
   auth.signInWithEmailAndPassword(email, password)
     .then(() => {
