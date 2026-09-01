@@ -1,6 +1,6 @@
 // Firebase Project Configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDWLIkXikb_ZYAOZxzgi44GQTbJ8eRlw_Y",
+  apiKey: "AIzaSyDWLIkXikb_ZYAOZxzgI44GQTbJ8eRlw_Y",
   authDomain: "streamkids-app.firebaseapp.com",
   projectId: "streamkids-app",
   storageBucket: "streamkids-app.firebasestorage.app",
