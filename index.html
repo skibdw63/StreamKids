@@ -33,9 +33,15 @@
     <section id="feed-tab" class="tab-content active">
       <h2>Live Stream Feed</h2>
       
-      <div class="stream-controls">
+      <div class="stream-controls" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
         <input type="text" id="remote-peer-input" placeholder="Enter Streamer's Peer ID">
         <button onclick="connectToStreamer()">Watch Stream</button>
+
+        <!-- Microphone Device Selector -->
+        <label for="mic-select" style="font-size: 14px; margin-left: 10px;">Microphone:</label>
+        <select id="mic-select" style="padding: 8px; border-radius: 4px; background-color: #121212; color: white; border: 1px solid #444;">
+          <option value="">Loading microphones...</option>
+        </select>
       </div>
 
       <div class="video-grid">
