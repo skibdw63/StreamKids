@@ -3,266 +3,97 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StreamKids Prototype</title>
-  
-  <!-- Firebase SDKs -->
+  <title>StreamKids</title>
+
+  <!-- External Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Firebase & PeerJS Libraries -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-
-  <!-- PeerJS -->
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #0f0f0f;
-      color: #fff;
-    }
-
-    /* YouTube Navbar */
-    .navbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #0f0f0f;
-      padding: 10px 20px;
-      border-bottom: 1px solid #272727;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .logo { font-size: 20px; font-weight: bold; color: #ff0000; display: flex; align-items: center; gap: 8px;}
-    .logo span { color: #fff; }
-    .search-bar { width: 40%; padding: 8px 15px; border-radius: 20px; border: 1px solid #323232; background: #121212; color: #fff; }
-    .user-actions { display: flex; gap: 10px; }
-
-    /* Layout */
-    .container { display: flex; min-height: calc(100vh - 56px); }
-
-    /* Sidebar */
-    .sidebar {
-      width: 200px;
-      background: #0f0f0f;
-      padding: 15px;
-      border-right: 1px solid #272727;
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
-    .menu-item { padding: 10px; border-radius: 8px; cursor: pointer; color: #aaa; text-decoration: none; font-weight: bold; }
-    .menu-item:hover, .menu-item.active { background: #272727; color: #fff; }
-
-    /* Main Content */
-    .main-content { flex: 1; padding: 20px; }
-
-    /* Modals & Cards */
-    .modal {
-      background: #212121;
-      padding: 25px;
-      border-radius: 12px;
-      max-width: 500px;
-      margin: 30px auto;
-      text-align: center;
-      border: 1px solid #383838;
-    }
-    .btn {
-      padding: 10px 20px;
-      font-size: 15px;
-      border: none;
-      border-radius: 18px;
-      font-weight: bold;
-      cursor: pointer;
-      margin: 5px;
-    }
-    .btn-red { background: #cc0000; color: white; }
-    .btn-blue { background: #065fd4; color: white; }
-    .btn-green { background: #2e7d32; color: white; }
-
-    input {
-      width: 80%;
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 6px;
-      border: 1px solid #444;
-      background: #121212;
-      color: white;
-    }
-
-    /* Stream Feed Grid */
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
-      margin-top: 20px;
-    }
-    .video-card {
-      background: #181818;
-      border-radius: 10px;
-      overflow: hidden;
-      border: 1px solid #272727;
-    }
-    .video-card video { width: 100%; height: 180px; background: #000; }
-    .video-info { padding: 12px; }
-    .video-title { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
-    .video-author { font-size: 13px; color: #aaa; }
-  </style>
 </head>
 <body>
 
-  <!-- Top YouTube Navbar -->
+  <!-- Top Navbar -->
   <div class="navbar">
-    <div class="logo">🔴 <span>StreamKids</span></div>
-    <input type="text" class="search-bar" placeholder="Search channels or streams...">
-    <div class="user-actions">
+    <div class="logo">🔴 StreamKids</div>
+    <div>
       <button class="btn btn-red" onclick="startMyStream()">+ Go Live</button>
-      <button class="btn btn-blue" onclick="openSignup()">Sign Up</button>
+      <button class="btn btn-blue" onclick="openSignup()">Parent Sign Up</button>
     </div>
   </div>
 
   <div class="container">
-    <!-- YouTube Left Sidebar -->
+    <!-- Sidebar -->
     <div class="sidebar">
-      <div class="menu-item active" onclick="showTab('feed')">🏠 Home Feed</div>
+      <div class="menu-item active" onclick="showTab('feed')">🏠 Live Streams</div>
       <div class="menu-item" onclick="showTab('dashboard')">📊 Dashboard</div>
       <div class="menu-item" onclick="showTab('gate')">🌐 Country / Gate</div>
     </div>
 
-    <!-- Main Content Area -->
     <div class="main-content">
-
-      <!-- Country & Math Gate Section -->
+      <!-- Gate Tab -->
       <div id="section-gate">
         <div class="modal">
-          <h2>Where are you from?</h2>
-          <p style="margin-bottom: 15px; color: #aaa;">Select country to configure theme:</p>
+          <h2>Select Country</h2>
           <button class="btn btn-blue" onclick="selectCountry('USA')">USA 🇺🇸</button>
           <button class="btn btn-green" onclick="selectCountry('Mexico')">Mexico 🇲🇽</button>
           <button class="btn btn-red" onclick="selectCountry('Canada')">Canada 🇨🇦</button>
         </div>
 
         <div id="math-gate" class="modal" style="display: none;">
-          <h2>Parent Verification Gate</h2>
+          <h2>Parent Math Verification</h2>
           <p id="math-question">Loading...</p>
           <input type="number" id="math-answer" placeholder="Answer">
           <br>
-          <button class="btn btn-green" onclick="checkMath()">Verify</button>
+          <button class="btn btn-green" onclick="checkMath()">Verify Parent</button>
         </div>
       </div>
 
-      <!-- YouTube Home Feed -->
+      <!-- Feed Tab -->
       <div id="section-feed" style="display: none;">
-        <h2>Featured Streams & Videos</h2>
-        <div class="grid">
-          
-          <!-- Sample Player (Working Free Video Sample) -->
-          <div class="video-card">
-            <video controls poster="https://picsum.photos/300/180?random=1">
-              <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" type="video/mp4">
-            </video>
-            <div class="video-info">
-              <div class="video-title">Welcome to StreamKids!</div>
-              <div class="video-author">Alan Rivera • Safe Stream</div>
-            </div>
-          </div>
-
-          <!-- Active Webcam Broadcast Card -->
+        <h2>Active Live Broadcasts</h2>
+        <div class="grid" id="stream-grid">
           <div class="video-card">
             <video id="my-webcam" autoplay playsinline muted></video>
-            <div class="video-info">
-              <div class="video-title">My Live Stream</div>
-              <div class="video-author">Your Camera (Local Feed)</div>
-            </div>
+            <div style="margin-top: 8px; font-weight: bold;">Your Live Stream Feed</div>
+            <div id="my-peer-id" style="font-size: 12px; color: #aaa;">Peer ID: Off</div>
           </div>
-
+          <div class="video-card">
+            <video id="remote-webcam" autoplay playsinline></video>
+            <div style="margin-top: 8px; font-weight: bold;">Watched Remote Stream</div>
+            <input type="text" id="remote-peer-input" placeholder="Enter Streamer Peer ID" style="width: 70%;">
+            <button class="btn btn-blue" onclick="connectToStreamer()">Watch</button>
+          </div>
         </div>
       </div>
 
-      <!-- YouTube Creator Dashboard -->
+      <!-- Dashboard Tab -->
       <div id="section-dashboard" style="display: none;">
-        <h2>Creator Studio Dashboard</h2>
-        <p style="color: #aaa; margin-top: 5px;">Manage your channel metrics and stream key</p>
-        
-        <div class="grid" style="margin-top: 15px;">
-          <div class="video-card" style="padding: 20px;">
-            <h3>Total Views</h3>
-            <p style="font-size: 28px; font-weight: bold; color: #4caf50; margin-top: 10px;">1,240</p>
-          </div>
-          <div class="video-card" style="padding: 20px;">
-            <h3>Subscriber Count</h3>
-            <p style="font-size: 28px; font-weight: bold; color: #2196f3; margin-top: 10px;">85</p>
-          </div>
-          <div class="video-card" style="padding: 20px;">
-            <h3>Parent Safety Status</h3>
-            <p style="font-size: 18px; font-weight: bold; color: #ff9800; margin-top: 10px;">Verified ✅</p>
-          </div>
+        <h2>Creator Dashboard</h2>
+        <div class="grid">
+          <div class="video-card"><h3>Views</h3><p style="font-size: 24px; color: #4caf50;">0</p></div>
+          <div class="video-card"><h3>Parent Status</h3><p id="stat-status" style="font-size: 18px; color: #ff9800;">Pending Verification</p></div>
         </div>
       </div>
 
       <!-- Sign Up Modal -->
       <div id="signup-modal" class="modal" style="display: none;">
-        <h2>Parent & Kid Sign Up</h2>
-        <input type="email" id="parent-email" placeholder="Parent Email Address">
+        <h2>Parent & Creator Registration</h2>
+        <input type="email" id="parent-email" placeholder="Parent Email">
         <input type="password" id="parent-pass" placeholder="Password">
         <br>
-        <button class="btn btn-blue" onclick="registerUser()">Create Account</button>
-        <button class="btn" style="background: #444;" onclick="closeSignup()">Cancel</button>
+        <button class="btn btn-blue" onclick="registerUser()">Register Account</button>
+        <button class="btn" style="background: #444;" onclick="closeSignup()">Close</button>
       </div>
-
     </div>
   </div>
 
-  <script>
-    let num1, num2, correctAnswer;
-    let peer, localStream;
-
-    function showTab(tabName) {
-      document.getElementById('section-gate').style.display = 'none';
-      document.getElementById('section-feed').style.display = 'none';
-      document.getElementById('section-dashboard').style.display = 'none';
-
-      document.getElementById('section-' + tabName).style.display = 'block';
-    }
-
-    function selectCountry(country) {
-      num1 = Math.floor(Math.random() * 80) + 12;
-      num2 = Math.floor(Math.random() * 8) + 2;
-      correctAnswer = num1 * num2;
-
-      document.getElementById('math-question').innerText = `Parents: What is ${num1} × ${num2}?`;
-      document.getElementById('math-gate').style.display = 'block';
-    }
-
-    function checkMath() {
-      let ans = parseInt(document.getElementById('math-answer').value);
-      if (ans === correctAnswer) {
-        alert("Parent verified! Loading StreamKids Home Feed.");
-        showTab('feed');
-      } else {
-        alert("Incorrect math answer.");
-      }
-    }
-
-    function startMyStream() {
-      showTab('feed');
-      navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-        .then((stream) => {
-          localStream = stream;
-          document.getElementById('my-webcam').srcObject = stream;
-        })
-        .catch((err) => {
-          alert("Webcam permission required to stream!");
-        });
-    }
-
-    function openSignup() { document.getElementById('signup-modal').style.display = 'block'; }
-    function closeSignup() { document.getElementById('signup-modal').style.display = 'none'; }
-
-    function registerUser() {
-      alert("Sign up successful! Parent account attached.");
-      closeSignup();
-    }
-  </script>
+  <!-- Custom External JavaScript Files -->
+  <script src="js/firebase-config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/stream.js"></script>
 </body>
 </html>
