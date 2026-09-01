@@ -2,117 +2,139 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 body {
-  font-family: Arial, sans-serif;
   background-color: #0f0f0f;
-  color: #fff;
+  color: #ffffff;
 }
 
 .navbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #0f0f0f;
-  padding: 10px 20px;
-  border-bottom: 1px solid #272727;
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  padding: 15px 30px;
+  background-color: #212121;
+  border-bottom: 1px solid #383838;
 }
 
 .logo {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: bold;
   color: #ff0000;
 }
 
-.container {
-  display: flex;
-  min-height: calc(100vh - 56px);
-}
-
-.sidebar {
-  width: 200px;
-  background: #0f0f0f;
-  padding: 15px;
-  border-right: 1px solid #272727;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.menu-item {
-  padding: 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  color: #aaa;
-  font-weight: bold;
-}
-
-.menu-item:hover, .menu-item.active {
-  background: #272727;
-  color: #fff;
-}
-
-.main-content {
-  flex: 1;
-  padding: 20px;
-}
-
-.modal {
-  background: #212121;
-  padding: 25px;
-  border-radius: 12px;
-  max-width: 500px;
-  margin: 20px auto;
-  text-align: center;
-  border: 1px solid #383838;
-}
-
-.btn {
-  padding: 10px 20px;
-  font-size: 15px;
+.nav-buttons button {
+  background-color: #383838;
+  color: white;
   border: none;
+  padding: 8px 16px;
+  margin-left: 10px;
   border-radius: 18px;
-  font-weight: bold;
   cursor: pointer;
-  margin: 5px;
 }
 
-.btn-red { background: #cc0000; color: white; }
-.btn-blue { background: #065fd4; color: white; }
-.btn-green { background: #2e7d32; color: white; }
+.nav-buttons .go-live-btn {
+  background-color: #cc0000;
+  font-weight: bold;
+}
 
-input {
-  width: 85%;
+.container {
+  padding: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.stream-controls {
+  margin: 20px 0;
+}
+
+.stream-controls input {
   padding: 10px;
-  margin: 8px 0;
-  border-radius: 6px;
+  width: 280px;
+  border-radius: 4px;
   border: 1px solid #444;
-  background: #121212;
+  background-color: #121212;
   color: white;
 }
 
-.grid {
+.stream-controls button {
+  padding: 10px 20px;
+  background-color: #065fd4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.video-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: 1fr 1fr;
   gap: 20px;
-  margin-top: 20px;
 }
 
 .video-card {
-  background: #181818;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid #272727;
-  padding: 10px;
+  background-color: #1f1f1f;
+  padding: 15px;
+  border-radius: 8px;
 }
 
 video {
   width: 100%;
-  height: 200px;
-  background: #000;
+  height: 320px;
+  background-color: #000;
+  border-radius: 6px;
+  margin-top: 10px;
+}
+
+.auth-box {
+  background-color: #212121;
+  padding: 30px;
+  max-width: 450px;
+  margin: 40px auto;
   border-radius: 8px;
+}
+
+.math-problem {
+  font-size: 18px;
+  margin: 15px 0;
+  font-weight: bold;
+}
+
+.auth-box input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 12px;
+  background-color: #121212;
+  border: 1px solid #444;
+  color: white;
+  border-radius: 4px;
+}
+
+.auth-box button {
+  width: 100%;
+  padding: 10px;
+  background-color: #cc0000;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.hidden {
+  display: none;
+}
+
+.status-msg {
+  margin-top: 10px;
+  font-size: 14px;
 }
