@@ -14,6 +14,7 @@ if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
 
-// Global scope references
+// Expose instances globally
 window.db = firebase.firestore();
 window.auth = firebase.auth();
+window.storage = firebase.storage();
