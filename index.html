@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StreamKids</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css">
 
   <!-- Firebase Compatibility SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -20,6 +19,228 @@
   <script src="js/firebase-config.js"></script>
   <script src="js/stream.js"></script>
   <script src="js/video.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #121212;
+      color: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+      padding: 20px;
+    }
+
+    /* Top Navigation Bar */
+    .main-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .nav-btn {
+      background: #222222;
+      color: #ffffff;
+      border: 1px solid #333333;
+      padding: 8px 16px;
+      font-size: 0.95rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .nav-btn:hover {
+      background: #333333;
+    }
+
+    /* Main Dashboard Panels */
+    .card-panel {
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+    }
+
+    .card-panel h2 {
+      font-size: 1.5rem;
+      margin-bottom: 15px;
+    }
+
+    /* Control Bar Inputs & Buttons */
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .mic-row {
+      margin-top: 10px;
+    }
+
+    .mic-select {
+      width: 380px;
+    }
+
+    .mic-label {
+      font-size: 0.9rem;
+      color: #cccccc;
+      margin-left: 10px;
+    }
+
+    .divider {
+      color: #444444;
+      margin: 0 4px;
+    }
+
+    .dark-input {
+      background: #121212;
+      border: 1px solid #333333;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .dark-input:focus {
+      border-color: #0088ff;
+    }
+
+    .full-width {
+      width: 100%;
+    }
+
+    .flex-input {
+      flex: 1;
+    }
+
+    /* Buttons */
+    .btn {
+      border: none;
+      padding: 8px 16px;
+      font-weight: bold;
+      font-size: 0.9rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn-green { background: #00aa44; color: #ffffff; }
+    .btn-green:hover { background: #00cc55; }
+
+    .btn-red { background: #cc0000; color: #ffffff; }
+    .btn-red:hover { background: #ff0000; }
+
+    .btn-blue { background: #0077ff; color: #ffffff; }
+    .btn-blue:hover { background: #0099ff; }
+
+    .btn-gray { background: #e0e0e0; color: #000000; }
+    .btn-gray:hover { background: #ffffff; }
+
+    /* Viewers Counter Bar */
+    .viewer-count-bar {
+      margin: 15px 0;
+      font-weight: bold;
+      font-size: 1rem;
+    }
+
+    .green-text {
+      color: #00ffcc;
+    }
+
+    /* Grid Layout for Videos & Chat */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 350px;
+      gap: 20px;
+    }
+
+    .video-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .video-card, .chat-card {
+      background: #1e1e1e;
+      padding: 15px;
+      border-radius: 6px;
+    }
+
+    .video-card h3, .chat-card h3 {
+      font-size: 1.1rem;
+      margin-bottom: 6px;
+    }
+
+    .peer-id-text {
+      font-size: 0.8rem;
+      color: #888888;
+      margin-bottom: 10px;
+    }
+
+    .stream-video {
+      width: 100%;
+      height: 260px;
+      background: #000000;
+      border-radius: 4px;
+      object-fit: contain;
+    }
+
+    /* Chat Layout */
+    .chat-column {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-card {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-box {
+      background: #121212;
+      border: 1px solid #222222;
+      border-radius: 4px;
+      flex: 1;
+      min-height: 450px;
+      max-height: 550px;
+      overflow-y: auto;
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    .chat-input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    /* Upload & FYP Boxes */
+    .drop-zone-box {
+      border: 2px dashed #444444;
+      padding: 30px;
+      text-align: center;
+      border-radius: 6px;
+      margin-bottom: 15px;
+    }
+
+    .upload-form-box {
+      background: #121212;
+      padding: 15px;
+      border-radius: 6px;
+      max-width: 500px;
+    }
+
+    .fyp-feed {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      max-width: 600px;
+    }
+  </style>
 
   <script>
     function showTab(tabId) {
