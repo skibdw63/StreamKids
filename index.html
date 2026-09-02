@@ -27,7 +27,7 @@
       const target = document.getElementById(tabId);
       if (target) target.style.display = 'block';
 
-      if (tabId === 'fyp-tab') {
+      if (tabId === 'fyp-tab' && typeof loadFYP === 'function') {
         loadFYP();
       }
     }
@@ -37,13 +37,13 @@
 
   <!-- Top Navigation Bar -->
   <nav class="main-nav">
-    <button onclick="showTab('feed')" class="nav-btn active">Live Feed</button>
+    <button onclick="showTab('feed')" class="nav-btn">Live Feed</button>
     <button onclick="showTab('upload-tab')" class="nav-btn">Upload Video</button>
     <button onclick="showTab('fyp-tab')" class="nav-btn">For You</button>
     <button onclick="showTab('schedule')" class="nav-btn">Schedule</button>
   </nav>
 
-  <!-- Main Live Dashboard (Old StreamKids Layout) -->
+  <!-- Main Live Dashboard -->
   <div id="feed" class="tab-content">
     <div class="card-panel">
       <h2>Live Stream Feed</h2>
@@ -69,7 +69,7 @@
       <span>👁️ Live Viewers: <strong id="viewer-count" class="green-text">0</strong></span>
     </div>
 
-    <!-- Two-Column Layout (Cameras Left, Chat Right) -->
+    <!-- Two-Column Layout -->
     <div class="dashboard-grid">
       <!-- Left Column: Video Feeds -->
       <div class="video-column">
