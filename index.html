@@ -3,174 +3,137 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StreamKids - Live Streaming</title>
-  
-  <!-- Web App Manifest for Desktop Installation -->
+  <title>StreamKids</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#121212">
-
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="style.css">
 
   <!-- Firebase Compatibility SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
-  <!-- PeerJS CDN -->
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-</head>
-<body>
+  <!-- PeerJS WebRTC Library -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
-  <!-- Navbar -->
-  <nav class="navbar">
-    <div class="logo">StreamKids</div>
-    <div class="nav-buttons">
-      <button onclick="showTab('feed')">Home</button>
-      <button onclick="showTab('schedule')">Schedule</button>
-      <button onclick="showTab('auth')" id="nav-auth-btn">Parent Login / Sign Up</button>
-    </div>
-  </nav>
-
-  <!-- Main Content Container -->
-  <main class="container">
-
-    <!-- TAB 1: Stream Feed, Live Chat & Viewer Counter -->
-    <section id="feed-tab" class="tab-content active">
-      <h2>Live Stream Feed</h2>
-      
-      <div class="stream-controls">
-        <input type="text" id="stream-title-input" placeholder="Your Stream Title">
-        <button onclick="startMyStream()" class="go-live-btn">+ Go Live</button>
-        <button onclick="stopMyStream()" class="stop-btn">Stop Stream</button>
-
-        <span style="color: #444;">|</span>
-
-        <input type="text" id="search-stream-input" placeholder="Search Stream Title">
-        <button onclick="searchAndWatchStream()">Watch Stream</button>
-
-        <label for="mic-select" style="font-size: 14px; margin-left: 10px;">Microphone:</label>
-        <select id="mic-select">
-          <option value="">Loading microphones...</option>
-        </select>
-      </div>
-
-      <!-- Viewer Counter -->
-      <div id="viewer-count-box" style="margin-bottom: 15px; font-weight: bold; color: #00ffcc;">
-        👁️ Live Viewers: <span id="viewer-count">0</span>
-      </div>
-
-      <div class="video-grid">
-        <!-- Video Stream Box -->
-        <div class="video-section">
-          <div class="video-card">
-            <h3>Your Camera (Streamer)</h3>
-            <p id="my-peer-id">Peer ID: Connecting...</p>
-            <video id="my-webcam" autoplay playsinline muted></video>
-          </div>
-
-          <div class="video-card">
-            <h3>Watching Stream</h3>
-            <video id="remote-webcam" autoplay playsinline controls></video>
-          </div>
-        </div>
-
-        <!-- Real-Time Chat Box -->
-        <div class="chat-section">
-          <h3>Live Chat</h3>
-          <div id="chat-messages">
-            <p style="color: #777;">Join or start a stream to chat...</p>
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <input type="text" id="chat-input" placeholder="Type a message..." style="flex: 1;">
-            <button onclick="sendChatMessage()">Send</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- TAB 2: Scheduled Streams -->
-    <section id="schedule-tab" class="tab-content">
-      <h2>Scheduled Streams</h2>
-      
-      <div style="background: #1e1e1e; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-        <h3 style="margin-bottom: 12px;">Schedule a Broadcast</h3>
-        <input type="text" id="sched-title" placeholder="Stream Title" style="display: block; width: 100%; margin-bottom: 10px;">
-        <input type="datetime-local" id="sched-time" style="display: block; width: 100%; margin-bottom: 12px;">
-        <button onclick="scheduleStream()" class="go-live-btn">Save Schedule</button>
-      </div>
-
-      <h3>Upcoming Broadcasts</h3>
-      <div id="upcoming-streams-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
-        <p style="color: #aaa;">Loading upcoming streams...</p>
-      </div>
-    </section>
-
-    <!-- TAB 3: Parent Verification & Authentication -->
-    <section id="auth-tab" class="tab-content">
-      <div class="auth-box">
-        <h2>Parent Verification Gate</h2>
-        <p style="color: #aaa; margin-top: 5px;">COPPA Compliance: Solve the problem to continue.</p>
-
-        <!-- Parent Math Gate -->
-        <div id="math-gate" style="margin-top: 15px;">
-          <p id="math-question" class="math-problem"></p>
-          <input type="number" id="math-answer" placeholder="Your Answer">
-          <button onclick="verifyParentMath()">Verify Answer</button>
-        </div>
-
-        <!-- Hidden Auth Form -->
-        <div id="firebase-auth-form" class="hidden" style="margin-top: 20px;">
-          <h3 style="margin-bottom: 15px;">Parent Account Registration</h3>
-          <input type="email" id="auth-email" placeholder="Parent Email">
-          <input type="password" id="auth-password" placeholder="Password">
-          
-          <label for="user-country" style="display:block; margin: 10px 0 5px; font-size: 14px; text-align: left;">Where are you from?</label>
-          <select id="user-country">
-            <option value="">Select your country</option>
-            <option value="US">United States</option>
-            <option value="CA">Canada</option>
-            <option value="MX">Mexico</option>
-            <option value="UK">United Kingdom</option>
-            <option value="ES">Spain</option>
-            <option value="Other">Other</option>
-          </select>
-
-          <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
-            <button onclick="handleSignUp()">Sign Up</button>
-            <button onclick="handleLogin()">Log In</button>
-          </div>
-          <p id="auth-status" class="status-msg"></p>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- App Scripts - Must load in exact order -->
+  <!-- Custom Scripts -->
   <script src="js/firebase-config.js"></script>
-  <script src="js/auth.js"></script>
   <script src="js/stream.js"></script>
-  
-  <!-- Service Worker Registration for Desktop App Installation -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js')
-        .then(() => console.log('Service Worker Registered'))
-        .catch(err => console.log('Service Worker Failure:', err));
-    }
+  <script src="js/video.js"></script>
 
-    // Tab Display Handler
-    function showTab(tabName) {
-      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-      if (tabName === 'feed') document.getElementById('feed-tab').classList.add('active');
-      if (tabName === 'schedule') {
-        document.getElementById('schedule-tab').classList.add('active');
-        if (typeof loadScheduledStreams === 'function') {
-          loadScheduledStreams();
-        }
+  <script>
+    function showTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+      const target = document.getElementById(tabId);
+      if (target) target.style.display = 'block';
+
+      if (tabId === 'fyp-tab') {
+        loadFYP();
       }
-      if (tabName === 'auth') document.getElementById('auth-tab').classList.add('active');
     }
   </script>
+</head>
+<body style="background: #0d0d0d; color: #fff; font-family: sans-serif; margin: 20px;">
+
+  <h1>StreamKids</h1>
+
+  <!-- Navigation Bar -->
+  <nav style="display: flex; gap: 10px; margin-bottom: 20px;">
+    <button onclick="showTab('feed')">Live Feed</button>
+    <button onclick="showTab('go-live')">Go Live</button>
+    <button onclick="showTab('upload-tab')">Upload Video</button>
+    <button onclick="showTab('fyp-tab')">For You</button>
+    <button onclick="showTab('schedule')">Schedule</button>
+  </nav>
+
+  <!-- Live Feed Section -->
+  <div id="feed" class="tab-content">
+    <h2>Watch Stream</h2>
+    <input type="text" id="search-stream-input" placeholder="Enter Stream Title...">
+    <button onclick="searchAndWatchStream()">Watch Stream</button>
+
+    <div style="margin-top: 15px;">
+      <p>Live Viewers: <span id="viewer-count" style="color: #00ffcc; font-weight: bold;">0</span></p>
+      <video id="remote-webcam" autoplay playsinline controls style="width: 100%; max-width: 600px; background: #000; border-radius: 8px;"></video>
+    </div>
+
+    <!-- Chat -->
+    <div style="margin-top: 20px; max-width: 600px;">
+      <h3>Live Chat</h3>
+      <div id="chat-messages" style="height: 150px; background: #1a1a1a; overflow-y: auto; padding: 10px; border-radius: 6px; border: 1px solid #333;"></div>
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <input type="text" id="chat-input" placeholder="Type a message..." style="flex: 1; padding: 8px;">
+        <button onclick="sendChatMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Go Live Section -->
+  <div id="go-live" class="tab-content" style="display: none;">
+    <h2>Start Your Stream</h2>
+    <input type="text" id="stream-title-input" placeholder="Stream Title">
+    <br><br>
+    <label for="mic-select">Microphone: </label>
+    <select id="mic-select"></select>
+    <br><br>
+    <button onclick="startMyStream()">Start Broadcast</button>
+    <button onclick="stopMyStream()" style="background: red; color: white;">Stop Broadcast</button>
+    <p id="my-peer-id" style="color: #aaa;"></p>
+
+    <div style="margin-top: 15px;">
+      <video id="my-webcam" autoplay playsinline muted style="width: 100%; max-width: 600px; background: #000; border-radius: 8px;"></video>
+    </div>
+  </div>
+
+  <!-- Upload Video Section -->
+  <div id="upload-tab" class="tab-content" style="display: none;">
+    <h2>Upload MP4 Video</h2>
+    
+    <div id="drop-zone" style="border: 2px dashed #444; padding: 30px; text-align: center; margin-bottom: 15px; border-radius: 8px; cursor: pointer;">
+      <p style="margin-bottom: 10px;">Drag & Drop your MP4 video here, or click below</p>
+      <input type="file" id="video-file-input" accept="video/mp4" style="display: none;" onchange="handleFileSelect(event)">
+      <button onclick="document.getElementById('video-file-input').click()">Select File</button>
+    </div>
+
+    <div id="upload-form" style="display: none; background: #181818; padding: 15px; border-radius: 8px; max-width: 500px;">
+      <p id="selected-file-name" style="color: #00ffcc; font-weight: bold;"></p>
+      
+      <input type="text" id="video-title-input" placeholder="Video Title" style="width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box;"><br>
+      
+      <textarea id="video-desc-input" placeholder="Description..." style="width: 100%; height: 80px; padding: 8px; margin-bottom: 10px; box-sizing: border-box;"></textarea><br>
+
+      <div style="margin-bottom: 15px;">
+        <label style="margin-right: 15px;">
+          <input type="radio" name="video-visibility" value="public" checked> Public
+        </label>
+        <label>
+          <input type="radio" name="video-visibility" value="private"> Private
+        </label>
+      </div>
+
+      <button id="upload-btn" onclick="uploadVideo()">Publish Video</button>
+      <p id="upload-status" style="color: #aaa; margin-top: 10px;"></p>
+    </div>
+  </div>
+
+  <!-- For You Page Section -->
+  <div id="fyp-tab" class="tab-content" style="display: none;">
+    <h2>For You Feed</h2>
+    <div id="fyp-container" style="display: flex; flex-direction: column; gap: 20px; max-width: 600px;">
+      <!-- Feed populates here automatically -->
+    </div>
+  </div>
+
+  <!-- Schedule Section -->
+  <div id="schedule" class="tab-content" style="display: none;">
+    <h2>Schedule a Stream</h2>
+    <input type="text" id="sched-title" placeholder="Upcoming Title"><br><br>
+    <input type="datetime-local" id="sched-time"><br><br>
+    <button onclick="scheduleStream()">Save Schedule</button>
+
+    <h3>Upcoming Streams</h3>
+    <div id="upcoming-streams-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+  </div>
+
 </body>
 </html>
