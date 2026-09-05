@@ -15,7 +15,7 @@
   <!-- PeerJS WebRTC Library -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
-  <!-- Custom Scripts -->
+  <!-- Custom External Scripts -->
   <script src="js/firebase-config.js"></script>
   <script src="js/stream.js"></script>
   <script src="js/video.js"></script>
@@ -291,6 +291,7 @@
   </style>
 
   <script>
+    // Tab Switching Helper
     function showTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
       const target = document.getElementById(tabId);
@@ -301,6 +302,7 @@
       }
     }
 
+    // Google Authentication Handlers
     function loginWithGoogle() {
       const provider = new firebase.auth.GoogleAuthProvider();
       firebase.auth().signInWithPopup(provider).catch(err => alert(err.message));
@@ -310,30 +312,73 @@
       firebase.auth().signOut();
     }
 
+    // Admin Control: Trigger Shutdown via Firestore (Only for skibidiw63@gmail.com)
+    function shutdownApp() {
+      const user = firebase.auth().currentUser;
+      if (user && user.email && user.email.toLowerCase() === 'skibidiw63@gmail.com') {
+        firebase.firestore().collection('system').doc('status').set({ isShutdown: true })
+          .then(() => console.log("System shut down globally."))
+          .catch((err) => alert("Error triggering shutdown: " + err.message));
+      } else {
+        alert("Unauthorized!");
+      }
+    }
+
+    // Admin Control: Restore App via Firestore (Only for skibidiw63@gmail.com)
+    function restoreApp() {
+      const user = firebase.auth().currentUser;
+      if (user && user.email && user.email.toLowerCase() === 'skibidiw63@gmail.com') {
+        firebase.firestore().collection('system').doc('status').set({ isShutdown: false })
+          .then(() => console.log("System restored globally."))
+          .catch((err) => alert("Error restoring system: " + err.message));
+      } else {
+        alert("Unauthorized!");
+      }
+    }
+
+    // Application Initialization & Real-Time Listeners
     window.addEventListener('DOMContentLoaded', () => {
+      const db = firebase.firestore();
+
+      // 1. Sync Shutdown Overlay Live across ALL users
+      db.collection('system').doc('status').onSnapshot((doc) => {
+        const shutdownOverlay = document.getElementById('shutdown-screen');
+        if (shutdownOverlay) {
+          if (doc.exists && doc.data().isShutdown === true) {
+            shutdownOverlay.style.display = 'flex';
+          } else {
+            shutdownOverlay.style.display = 'none';
+          }
+        }
+      }, (error) => {
+        console.error("Error monitoring shutdown status:", error);
+      });
+
+      // 2. Auth State Listener (Controls Admin Buttons & User Info)
       firebase.auth().onAuthStateChanged(user => {
         const loginBtn = document.getElementById('login-btn');
         const userInfo = document.getElementById('user-info');
         const userName = document.getElementById('user-name');
         const userAvatar = document.getElementById('user-avatar');
         const shutdownBtn = document.getElementById('shutdown-btn');
+        const restoreBtn = document.getElementById('restore-btn');
+
+        const isAdmin = user && user.email && user.email.toLowerCase() === 'skibidiw63@gmail.com';
 
         if (user) {
-          loginBtn.style.display = 'none';
-          userInfo.style.display = 'flex';
-          userName.innerText = user.displayName || user.email;
-          if (user.photoURL) userAvatar.src = user.photoURL;
+          if (loginBtn) loginBtn.style.display = 'none';
+          if (userInfo) userInfo.style.display = 'flex';
+          if (userName) userName.innerText = user.displayName || user.email;
+          if (userAvatar && user.photoURL) userAvatar.src = user.photoURL;
 
-          // Admin check (UI visibility only)
-          if (user.email && user.email.toLowerCase() === 'skibidiw63@gmail.com') {
-            if (shutdownBtn) shutdownBtn.style.display = 'inline-block';
-          } else {
-            if (shutdownBtn) shutdownBtn.style.display = 'none';
-          }
+          // Admin button visibility logic
+          if (shutdownBtn) shutdownBtn.style.display = isAdmin ? 'inline-block' : 'none';
+          if (restoreBtn) restoreBtn.style.display = isAdmin ? 'inline-block' : 'none';
         } else {
-          loginBtn.style.display = 'inline-block';
-          userInfo.style.display = 'none';
+          if (loginBtn) loginBtn.style.display = 'inline-block';
+          if (userInfo) userInfo.style.display = 'none';
           if (shutdownBtn) shutdownBtn.style.display = 'none';
+          if (restoreBtn) restoreBtn.style.display = 'none';
         }
       });
     });
@@ -476,8 +521,9 @@
       </div>
     </div>
 
-    <button onclick="restoreApp()" style="margin-top: 30px; background: transparent; color: #555; border: 1px solid #333; padding: 6px 12px; cursor: pointer; border-radius: 4px;">
-      Turn Back On
+    <!-- Restore Button (Admin Only) -->
+    <button id="restore-btn" onclick="restoreApp()" style="display: none; margin-top: 30px; background: transparent; color: #888; border: 1px solid #444; padding: 8px 16px; cursor: pointer; border-radius: 4px; font-weight: bold;">
+      Turn Back On (Admin Only)
     </button>
   </div>
 
