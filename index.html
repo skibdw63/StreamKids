@@ -61,6 +61,7 @@
       width: 32px;
       height: 32px;
       border-radius: 50%;
+      cursor: pointer;
     }
 
     /* Top Navigation Bar */
@@ -248,6 +249,24 @@
       margin-top: 10px;
     }
 
+    .chat-username {
+      font-weight: bold;
+      color: #0088ff;
+      cursor: pointer;
+      margin-right: 4px;
+    }
+
+    .chat-username:hover {
+      text-decoration: underline;
+    }
+
+    .badge-icon {
+      color: #0088ff;
+      margin-left: 2px;
+      margin-right: 4px;
+      font-size: 0.95rem;
+    }
+
     .chat-input-row {
       display: flex;
       gap: 8px;
@@ -277,6 +296,63 @@
       max-width: 600px;
     }
 
+    /* Channel Profile Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background: #1e1e1e;
+      padding: 25px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 420px;
+      text-align: center;
+      position: relative;
+      border: 1px solid #333333;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      background: none;
+      border: none;
+      color: #aaaaaa;
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+
+    .close-btn:hover {
+      color: #ffffff;
+    }
+
+    .profile-avatar-lg {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      margin-bottom: 10px;
+      border: 2px solid #0088ff;
+      object-fit: cover;
+    }
+
+    .admin-control-box {
+      background: #121212;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 15px;
+      border: 1px dashed #444444;
+    }
+
     /* News Ticker Animation for Shutdown Overlay */
     .ticker-text {
       display: inline-block;
@@ -291,6 +367,10 @@
   </style>
 
   <script>
+    const ADMIN_EMAIL = 'skibidiw63@gmail.com';
+    let currentSelectedUid = null;
+    let currentSelectedUserVerified = false;
+
     // Tab Switching Helper
     function showTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
@@ -312,10 +392,10 @@
       firebase.auth().signOut();
     }
 
-    // Admin Control: Trigger Shutdown via Firestore (Only for skibidiw63@gmail.com)
+    // Admin Control: Trigger Shutdown via Firestore
     function shutdownApp() {
       const user = firebase.auth().currentUser;
-      if (user && user.email && user.email.toLowerCase() === 'skibidiw63@gmail.com') {
+      if (user && user.email && user.email.toLowerCase() === ADMIN_EMAIL) {
         firebase.firestore().collection('system').doc('status').set({ isShutdown: true })
           .then(() => console.log("System shut down globally."))
           .catch((err) => alert("Error triggering shutdown: " + err.message));
@@ -324,15 +404,91 @@
       }
     }
 
-    // Admin Control: Restore App via Firestore (Only for skibidiw63@gmail.com)
+    // Admin Control: Restore App via Firestore
     function restoreApp() {
       const user = firebase.auth().currentUser;
-      if (user && user.email && user.email.toLowerCase() === 'skibidiw63@gmail.com') {
+      if (user && user.email && user.email.toLowerCase() === ADMIN_EMAIL) {
         firebase.firestore().collection('system').doc('status').set({ isShutdown: false })
           .then(() => console.log("System restored globally."))
           .catch((err) => alert("Error restoring system: " + err.message));
       } else {
         alert("Unauthorized!");
+      }
+    }
+
+    // Channel Profile & Verification Modal System
+    function openChannelProfile(uid) {
+      if (!uid) return;
+      currentSelectedUid = uid;
+
+      const modal = document.getElementById('profile-modal');
+      const nameEl = document.getElementById('profile-modal-name');
+      const emailEl = document.getElementById('profile-modal-email');
+      const avatarEl = document.getElementById('profile-modal-avatar');
+      const badgeEl = document.getElementById('profile-modal-badge');
+      const adminControls = document.getElementById('admin-verify-controls');
+      const toggleBtn = document.getElementById('toggle-verify-btn');
+
+      firebase.firestore().collection('users').doc(uid).get().then(doc => {
+        if (doc.exists) {
+          const data = doc.data();
+          nameEl.innerText = data.displayName || 'User';
+          emailEl.innerText = data.email || '';
+          avatarEl.src = data.photoURL || 'https://via.placeholder.com/80';
+          
+          currentSelectedUserVerified = !!data.isVerified;
+          badgeEl.style.display = currentSelectedUserVerified ? 'inline' : 'none';
+
+          const currentUser = firebase.auth().currentUser;
+          const isAdmin = currentUser && currentUser.email && currentUser.email.toLowerCase() === ADMIN_EMAIL;
+
+          if (isAdmin) {
+            adminControls.style.display = 'block';
+            toggleBtn.innerText = currentSelectedUserVerified ? 'Revoke Verified Badge' : 'Grant Verified Badge';
+            toggleBtn.className = currentSelectedUserVerified ? 'btn btn-red' : 'btn btn-blue';
+          } else {
+            adminControls.style.display = 'none';
+          }
+
+          modal.style.display = 'flex';
+        }
+      }).catch(err => console.error("Error fetching user profile:", err));
+    }
+
+    function closeProfileModal() {
+      document.getElementById('profile-modal').style.display = 'none';
+      currentSelectedUid = null;
+    }
+
+    function toggleUserVerification() {
+      const currentUser = firebase.auth().currentUser;
+      if (!currentUser || currentUser.email.toLowerCase() !== ADMIN_EMAIL) {
+        alert("Unauthorized! Only skibidiw63@gmail.com can verify channels.");
+        return;
+      }
+
+      if (!currentSelectedUid) return;
+
+      const newStatus = !currentSelectedUserVerified;
+
+      firebase.firestore().collection('users').doc(currentSelectedUid).update({
+        isVerified: newStatus
+      }).then(() => {
+        currentSelectedUserVerified = newStatus;
+        document.getElementById('profile-modal-badge').style.display = newStatus ? 'inline' : 'none';
+        
+        const toggleBtn = document.getElementById('toggle-verify-btn');
+        toggleBtn.innerText = newStatus ? 'Revoke Verified Badge' : 'Grant Verified Badge';
+        toggleBtn.className = newStatus ? 'btn btn-red' : 'btn btn-blue';
+      }).catch(err => {
+        alert("Error updating badge: " + err.message);
+      });
+    }
+
+    function openMyProfile() {
+      const user = firebase.auth().currentUser;
+      if (user) {
+        openChannelProfile(user.uid);
       }
     }
 
@@ -354,7 +510,7 @@
         console.error("Error monitoring shutdown status:", error);
       });
 
-      // 2. Auth State Listener (Controls Admin Buttons & User Info)
+      // 2. Auth State Listener (Controls Admin Buttons, User Profile Sync & Info)
       firebase.auth().onAuthStateChanged(user => {
         const loginBtn = document.getElementById('login-btn');
         const userInfo = document.getElementById('user-info');
@@ -363,13 +519,28 @@
         const shutdownBtn = document.getElementById('shutdown-btn');
         const restoreBtn = document.getElementById('restore-btn');
 
-        const isAdmin = user && user.email && user.email.toLowerCase() === 'skibidiw63@gmail.com';
+        const isAdmin = user && user.email && user.email.toLowerCase() === ADMIN_EMAIL;
 
         if (user) {
           if (loginBtn) loginBtn.style.display = 'none';
           if (userInfo) userInfo.style.display = 'flex';
           if (userName) userName.innerText = user.displayName || user.email;
-          if (userAvatar && user.photoURL) userAvatar.src = user.photoURL;
+          if (userAvatar) {
+            userAvatar.src = user.photoURL || 'https://via.placeholder.com/32';
+          }
+
+          // Sync user document in Firestore
+          const userRef = db.collection('users').doc(user.uid);
+          userRef.get().then(doc => {
+            if (!doc.exists) {
+              userRef.set({
+                displayName: user.displayName || 'Anonymous',
+                email: user.email,
+                photoURL: user.photoURL || '',
+                isVerified: isAdmin
+              });
+            }
+          });
 
           // Admin button visibility logic
           if (shutdownBtn) shutdownBtn.style.display = isAdmin ? 'inline-block' : 'none';
@@ -392,8 +563,8 @@
     <div>
       <button id="login-btn" onclick="loginWithGoogle()" class="btn btn-blue">Sign in with Google</button>
       <div id="user-info" class="user-profile-info" style="display: none;">
-        <img id="user-avatar" class="user-avatar" src="" alt="Avatar">
-        <span id="user-name"></span>
+        <img id="user-avatar" class="user-avatar" src="" alt="Avatar" onclick="openMyProfile()" title="Click to view channel profile">
+        <span id="user-name" onclick="openMyProfile()" style="cursor: pointer;"></span>
         <button onclick="logoutUser()" class="btn btn-red" style="padding: 4px 10px; font-size: 0.8rem;">Log Out</button>
       </div>
     </div>
@@ -506,6 +677,28 @@
 
       <h3 style="margin-top: 25px;">Upcoming Streams</h3>
       <div id="upcoming-streams-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;"></div>
+    </div>
+  </div>
+
+  <!-- Channel Profile Modal -->
+  <div id="profile-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeProfileModal()">✕</button>
+      
+      <img id="profile-modal-avatar" class="profile-avatar-lg" src="https://via.placeholder.com/80" alt="Avatar">
+      <h2 style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+        <span id="profile-modal-name">Username</span>
+        <span id="profile-modal-badge" class="badge-icon" style="display: none;" title="Verified Creator">☑️</span>
+      </h2>
+      <p id="profile-modal-email" style="color: #888; font-size: 0.85rem; margin-top: 4px;"></p>
+
+      <!-- Admin Control Panel (Only for skibidiw63@gmail.com) -->
+      <div id="admin-verify-controls" class="admin-control-box" style="display: none;">
+        <p style="font-size: 0.8rem; color: #aaaaaa; margin-bottom: 8px;">Admin Verification Control</p>
+        <button id="toggle-verify-btn" onclick="toggleUserVerification()" class="btn btn-blue" style="font-size: 0.8rem; padding: 6px 12px; width: 100%;">
+          Grant Verified Badge
+        </button>
+      </div>
     </div>
   </div>
 
