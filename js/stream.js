@@ -93,7 +93,7 @@ async function startMyStream() {
   }
 
   activeStreamTitle = streamTitle.toLowerCase();
-  showTab('feed');
+  if (typeof showTab === 'function') showTab('feed');
   const selectedMicId = document.getElementById('mic-select')?.value;
 
   const constraints = {
@@ -104,6 +104,7 @@ async function startMyStream() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     localStream = stream;
+    window.localStream = stream;
     const localVideo = document.getElementById('my-webcam');
     if (localVideo) localVideo.srcObject = stream;
 
@@ -154,7 +155,6 @@ async function searchAndWatchStream() {
     activeStreamTitle = searchTitle;
     const targetPeerId = doc.data().peerId;
 
-    // 1. Add viewer to Firestore BEFORE initializing PeerJS connection
     const viewerRef = await dbInstance.collection('active_streams')
       .doc(searchTitle)
       .collection('viewers')
@@ -162,14 +162,10 @@ async function searchAndWatchStream() {
 
     currentViewerDocId = viewerRef.id;
 
-    // 2. Start heartbeat pings
     startHeartbeat(searchTitle, currentViewerDocId);
-
-    // 3. Listen to count & chat immediately
     listenToChat(activeStreamTitle);
     listenToViewers(activeStreamTitle);
 
-    // 4. Connect to Host via PeerJS Call
     await initPeer();
 
     const options = { constraints: { offerToReceiveAudio: true, offerToReceiveVideo: true } };
@@ -231,7 +227,6 @@ async function leaveCurrentStreamAsViewer() {
   }
 }
 
-// Window Unload Fallback
 window.addEventListener('beforeunload', () => {
   leaveCurrentStreamAsViewer();
 });
@@ -248,6 +243,7 @@ async function stopMyStream() {
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
     localStream = null;
+    window.localStream = null;
   }
 
   const localVideo = document.getElementById('my-webcam');
@@ -259,6 +255,7 @@ async function stopMyStream() {
   if (peer) {
     peer.destroy();
     peer = null;
+    window.peer = null;
     currentPeerId = null;
   }
 
@@ -268,7 +265,7 @@ async function stopMyStream() {
   console.log("Stream stopped.");
 }
 
-// Real-Time Viewer Count Listener (Handles pending server timestamps safely)
+// Real-Time Viewer Count Listener
 function listenToViewers(streamTitle) {
   const dbInstance = getDb();
   if (!dbInstance) return;
@@ -285,13 +282,11 @@ function listenToViewers(streamTitle) {
       snapshot.forEach((doc) => {
         const data = doc.data();
 
-        // 1. Pending local write from serverTimestamp()
         if (!data.lastSeen) {
           activeCount++;
           return;
         }
 
-        // 2. Parse timestamp safely
         let lastSeenTime = now;
         if (typeof data.lastSeen.toMillis === 'function') {
           lastSeenTime = data.lastSeen.toMillis();
@@ -299,7 +294,6 @@ function listenToViewers(streamTitle) {
           lastSeenTime = data.lastSeen.toDate().getTime();
         }
 
-        // 3. Count active sessions within 12s window
         if (now - lastSeenTime < 12000) {
           activeCount++;
         } else {
@@ -339,7 +333,7 @@ function listenToChat(streamTitle) {
     });
 }
 
-// Send Chat Message Function
+// Send Chat Message
 async function sendChatMessage() {
   const input = document.getElementById('chat-input');
   const text = input ? input.value.trim() : "";
@@ -361,7 +355,7 @@ async function sendChatMessage() {
   }
 
   try {
-    const user = window.auth ? auth.currentUser : null;
+    const user = firebase.auth ? firebase.auth().currentUser : null;
     const senderName = user && user.email ? user.email.split('@')[0] : "Guest Viewer";
 
     await dbInstance.collection('active_streams')
@@ -443,103 +437,101 @@ async function loadScheduledStreams() {
   }
 }
 
-// Startup
-document.addEventListener('DOMContentLoaded', () => {
-  getMicrophones();
-});
-// Add this to the very bottom of your existing js/stream.js file
+// ==========================================
+// GLOBAL SHUTDOWN SYSTEM (FIRESTORE BACKED)
+// ==========================================
 
-function shutdownApp() {
+// Writes true to Firestore globally
+async function shutdownApp() {
   const user = firebase.auth().currentUser;
-  
-  // Security Guard: Check if email matches admin
+
   if (!user || !user.email || user.email.toLowerCase() !== 'skibidiw63@gmail.com') {
     alert("Access denied. Only the administrator can shut down StreamKids.");
     return;
   }
 
-  const confirmShutdown = confirm("Are you sure you want to shut down StreamKids?");
+  const confirmShutdown = confirm("Are you sure you want to shut down StreamKids for ALL users?");
   if (!confirmShutdown) return;
 
-  // 1. Stop webcam and mic streams
-  if (window.localStream) {
-    window.localStream.getTracks().forEach(track => track.stop());
-    window.localStream = null;
-  }
+  const dbInstance = getDb();
+  if (!dbInstance) return;
 
-  // 2. Clear video players
-  const myVideo = document.getElementById('my-webcam');
-  const remoteVideo = document.getElementById('remote-webcam');
-  if (myVideo) myVideo.srcObject = null;
-  if (remoteVideo) remoteVideo.srcObject = null;
-
-  // 3. Disconnect WebRTC peer connections
-  if (window.peer) {
-    window.peer.destroy();
-    window.peer = null;
-  }
-
-  // 4. Sign out Firebase session
-  firebase.auth().signOut();
-
-  // 5. Show full-screen TV news shutdown overlay
-  const shutdownScreen = document.getElementById('shutdown-screen');
-  if (shutdownScreen) {
-    shutdownScreen.style.display = 'flex';
+  try {
+    await dbInstance.collection('system').doc('status').set({
+      isShutdown: true,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (err) {
+    console.error("Error setting global shutdown state:", err);
+    alert("Failed to trigger global shutdown: " + err.message);
   }
 }
-// Admin-only shutdown function
-function shutdownApp() {
-  const user = firebase.auth().currentUser;
-  
-  // Security Guard: Check if email matches admin
-  if (!user || !user.email || user.email.toLowerCase() !== 'skibidiw63@gmail.com') {
-    alert("Access denied. Only the administrator can shut down StreamKids.");
-    return;
+
+// Resets Firestore state to allow everyone back
+async function restoreApp() {
+  const dbInstance = getDb();
+  if (!dbInstance) return;
+
+  try {
+    await dbInstance.collection('system').doc('status').set({
+      isShutdown: false,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (err) {
+    console.error("Error resetting shutdown state:", err);
+    const shutdownScreen = document.getElementById('shutdown-screen');
+    if (shutdownScreen) shutdownScreen.style.display = 'none';
   }
+}
 
-  const confirmShutdown = confirm("Are you sure you want to shut down StreamKids?");
-  if (!confirmShutdown) return;
-
-  // 1. Stop webcam and mic streams
-  if (window.localStream) {
-    window.localStream.getTracks().forEach(track => track.stop());
+// Executed by EVERY user locally when Firestore reports isShutdown: true
+function executeLocalShutdown() {
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
     window.localStream = null;
   }
 
-  // 2. Clear video players
   const myVideo = document.getElementById('my-webcam');
   const remoteVideo = document.getElementById('remote-webcam');
   if (myVideo) myVideo.srcObject = null;
   if (remoteVideo) remoteVideo.srcObject = null;
 
-  // 3. Disconnect WebRTC peer connections
-  if (window.peer) {
-    window.peer.destroy();
+  if (peer) {
+    peer.destroy();
+    peer = null;
     window.peer = null;
   }
 
-  // 4. Sign out Firebase session
-  firebase.auth().signOut();
-
-  // 5. Show full-screen TV news shutdown overlay
   const shutdownScreen = document.getElementById('shutdown-screen');
   if (shutdownScreen) {
     shutdownScreen.style.display = 'flex';
   }
 }
 
-// Function to reverse the shutdown and turn StreamKids back on
-function restoreApp() {
-  const shutdownScreen = document.getElementById('shutdown-screen');
-  if (shutdownScreen) {
-    shutdownScreen.style.display = 'none';
-  }
-}
-
-// Keyboard shortcut (Ctrl + Shift + R) to turn back on
+// Key listener to restore app (Ctrl + Shift + R)
 window.addEventListener('keydown', (event) => {
   if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'r') {
     restoreApp();
+  }
+});
+
+// Real-Time Listener attached on startup
+document.addEventListener('DOMContentLoaded', () => {
+  getMicrophones();
+
+  const dbInstance = getDb();
+  if (dbInstance) {
+    dbInstance.collection('system').doc('status')
+      .onSnapshot((doc) => {
+        const shutdownScreen = document.getElementById('shutdown-screen');
+        if (doc.exists && doc.data().isShutdown === true) {
+          executeLocalShutdown();
+        } else {
+          if (shutdownScreen) shutdownScreen.style.display = 'none';
+        }
+      }, (err) => {
+        console.error("Global shutdown listener error:", err);
+      });
   }
 });
