@@ -81,7 +81,7 @@ function initPeer() {
   });
 }
 
-// Go Live Function (Host)
+// Go Live Function (Host) with Auto-Fallback Logic
 async function startMyStream() {
   const titleInput = document.getElementById('stream-title-input');
   const streamTitle = titleInput ? titleInput.value.trim() : "";
@@ -101,13 +101,45 @@ async function startMyStream() {
   if (typeof showTab === 'function') showTab('feed');
   const selectedMicId = document.getElementById('mic-select')?.value;
 
-  const constraints = {
-    video: true,
-    audio: selectedMicId ? { deviceId: { exact: selectedMicId } } : true
-  };
+  let stream = null;
+
+  // Step 1: Try using the specifically selected microphone
+  if (selectedMicId) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: { deviceId: { exact: selectedMicId } }
+      });
+    } catch (err) {
+      console.warn("Selected microphone failed, falling back to default mic...", err);
+    }
+  }
+
+  // Step 2: Fallback to default system audio if selected mic failed
+  if (!stream) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+    } catch (err) {
+      console.warn("Default microphone failed, trying video only...", err);
+    }
+  }
+
+  // Step 3: Fallback to video-only if audio devices are blocked/occupied
+  if (!stream) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      alert("Microphone unavailable. Stream started with video only.");
+    } catch (err) {
+      alert("Unable to access camera or microphone. Check browser permissions.");
+      console.error("Camera and Mic access failed completely:", err);
+      return;
+    }
+  }
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
     localStream = stream;
     window.localStream = stream;
     const localVideo = document.getElementById('my-webcam');
@@ -126,8 +158,8 @@ async function startMyStream() {
 
     alert(`Stream "${streamTitle}" is live!`);
   } catch (err) {
-    alert("Unable to access camera or microphone.");
-    console.error(err);
+    console.error("Error setting up stream on Firebase/PeerJS:", err);
+    alert("Error starting live stream.");
   }
 }
 
