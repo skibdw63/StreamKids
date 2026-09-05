@@ -187,6 +187,12 @@
       gap: 20px;
     }
 
+    @media (max-width: 900px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .video-column {
       display: flex;
       flex-direction: column;
@@ -318,7 +324,7 @@
           userName.innerText = user.displayName || user.email;
           if (user.photoURL) userAvatar.src = user.photoURL;
 
-          // Only display the shutdown button for skibidiw63@gmail.com
+          // Admin check (UI visibility only)
           if (user.email && user.email.toLowerCase() === 'skibidiw63@gmail.com') {
             if (shutdownBtn) shutdownBtn.style.display = 'inline-block';
           } else {
@@ -362,20 +368,20 @@
     <div class="card-panel">
       <h2>Live Stream Feed</h2>
       <div class="controls-bar">
-        <input type="text" id="stream-title-input" placeholder="Stream Title..." class="dark-input">
+        <input type="text" id="stream-title-input" placeholder="Stream Title..." class="dark-input" aria-label="Stream Title">
         <button onclick="startMyStream()" class="btn btn-green">+ Go Live</button>
         <button onclick="stopMyStream()" class="btn btn-red">Stop Stream</button>
 
         <span class="divider">|</span>
 
-        <input type="text" id="search-stream-input" placeholder="Search Stream..." class="dark-input">
+        <input type="text" id="search-stream-input" placeholder="Search Stream..." class="dark-input" aria-label="Search Stream">
         <button onclick="searchAndWatchStream()" class="btn btn-blue">Watch Stream</button>
 
         <label for="mic-select" class="mic-label">Microphone:</label>
       </div>
 
       <div class="mic-row">
-        <select id="mic-select" class="dark-input mic-select"></select>
+        <select id="mic-select" class="dark-input mic-select" aria-label="Microphone Selection"></select>
       </div>
     </div>
 
@@ -403,7 +409,7 @@
           <h3>Live Chat</h3>
           <div id="chat-messages" class="chat-box"></div>
           <div class="chat-input-row">
-            <input type="text" id="chat-input" placeholder="Type a message..." class="dark-input flex-input">
+            <input type="text" id="chat-input" placeholder="Type a message..." class="dark-input flex-input" aria-label="Chat Message">
             <button onclick="sendChatMessage()" class="btn btn-gray">Send</button>
           </div>
         </div>
@@ -423,8 +429,8 @@
 
       <div id="upload-form" style="display: none;" class="upload-form-box">
         <p id="selected-file-name" class="green-text" style="margin-bottom: 10px;"></p>
-        <input type="text" id="video-title-input" placeholder="Video Title" class="dark-input full-width"><br><br>
-        <textarea id="video-desc-input" placeholder="Description..." class="dark-input full-width" style="height: 80px;"></textarea><br><br>
+        <input type="text" id="video-title-input" placeholder="Video Title" class="dark-input full-width" aria-label="Video Title"><br><br>
+        <textarea id="video-desc-input" placeholder="Description..." class="dark-input full-width" style="height: 80px;" aria-label="Video Description"></textarea><br><br>
 
         <div style="margin-bottom: 15px;">
           <label style="margin-right: 15px;"><input type="radio" name="video-visibility" value="public" checked> Public</label>
@@ -449,8 +455,8 @@
   <div id="schedule" class="tab-content" style="display: none;">
     <div class="card-panel">
       <h2>Schedule a Stream</h2>
-      <input type="text" id="sched-title" placeholder="Upcoming Title" class="dark-input"><br><br>
-      <input type="datetime-local" id="sched-time" class="dark-input"><br><br>
+      <input type="text" id="sched-title" placeholder="Upcoming Title" class="dark-input" aria-label="Schedule Title"><br><br>
+      <input type="datetime-local" id="sched-time" class="dark-input" aria-label="Schedule Time"><br><br>
       <button onclick="scheduleStream()" class="btn btn-blue">Save Schedule</button>
 
       <h3 style="margin-top: 25px;">Upcoming Streams</h3>
@@ -466,7 +472,7 @@
 
     <div style="width: 100%; background: #cc0000; color: #ffffff; overflow: hidden; white-space: nowrap; padding: 12px 0; font-family: monospace; font-size: 1.2rem; font-weight: bold; border-top: 3px solid #ff5555; border-bottom: 3px solid #ff5555;">
       <div class="ticker-text">
-        STREAMKIDS HAS SHUTDOWNED, PLEASE TRY AGAIN WHEN IT IS OPEN &nbsp;&nbsp;•••&nbsp;&nbsp; STREAMKIDS HAS SHUTDOWNED, PLEASE TRY AGAIN WHEN IT IS OPEN &nbsp;&nbsp;•••&nbsp;&nbsp; STREAMKIDS HAS SHUTDOWNED, PLEASE TRY AGAIN WHEN IT IS OPEN
+        STREAMKIDS HAS SHUTDOWN, PLEASE TRY AGAIN WHEN IT IS OPEN &nbsp;&nbsp;•••&nbsp;&nbsp; STREAMKIDS HAS SHUTDOWN, PLEASE TRY AGAIN WHEN IT IS OPEN &nbsp;&nbsp;•••&nbsp;&nbsp; STREAMKIDS HAS SHUTDOWN, PLEASE TRY AGAIN WHEN IT IS OPEN
       </div>
     </div>
 
