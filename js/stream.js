@@ -447,3 +447,44 @@ async function loadScheduledStreams() {
 document.addEventListener('DOMContentLoaded', () => {
   getMicrophones();
 });
+// Add this to the very bottom of your existing js/stream.js file
+
+function shutdownApp() {
+  const user = firebase.auth().currentUser;
+  
+  // Security Guard: Check if email matches admin
+  if (!user || !user.email || user.email.toLowerCase() !== 'skibidiw63@gmail.com') {
+    alert("Access denied. Only the administrator can shut down StreamKids.");
+    return;
+  }
+
+  const confirmShutdown = confirm("Are you sure you want to shut down StreamKids?");
+  if (!confirmShutdown) return;
+
+  // 1. Stop webcam and mic streams
+  if (window.localStream) {
+    window.localStream.getTracks().forEach(track => track.stop());
+    window.localStream = null;
+  }
+
+  // 2. Clear video players
+  const myVideo = document.getElementById('my-webcam');
+  const remoteVideo = document.getElementById('remote-webcam');
+  if (myVideo) myVideo.srcObject = null;
+  if (remoteVideo) remoteVideo.srcObject = null;
+
+  // 3. Disconnect WebRTC peer connections
+  if (window.peer) {
+    window.peer.destroy();
+    window.peer = null;
+  }
+
+  // 4. Sign out Firebase session
+  firebase.auth().signOut();
+
+  // 5. Show full-screen TV news shutdown overlay
+  const shutdownScreen = document.getElementById('shutdown-screen');
+  if (shutdownScreen) {
+    shutdownScreen.style.display = 'flex';
+  }
+}
