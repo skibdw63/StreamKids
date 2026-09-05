@@ -68,6 +68,7 @@
       display: flex;
       gap: 10px;
       margin-bottom: 15px;
+      align-items: center;
     }
 
     .nav-btn {
@@ -269,6 +270,18 @@
       gap: 20px;
       max-width: 600px;
     }
+
+    /* News Ticker Animation for Shutdown Overlay */
+    .ticker-text {
+      display: inline-block;
+      padding-left: 100%;
+      animation: scroll-ticker 18s linear infinite;
+    }
+
+    @keyframes scroll-ticker {
+      0% { transform: translate(0, 0); }
+      100% { transform: translate(-100%, 0); }
+    }
   </style>
 
   <script>
@@ -282,33 +295,39 @@
       }
     }
 
-    // Google Sign-In Logic
     function loginWithGoogle() {
       const provider = new firebase.auth.GoogleAuthProvider();
       firebase.auth().signInWithPopup(provider).catch(err => alert(err.message));
     }
 
-    // Sign-Out Logic
     function logoutUser() {
       firebase.auth().signOut();
     }
 
-    // Auto update UI on Login State Change
     window.addEventListener('DOMContentLoaded', () => {
       firebase.auth().onAuthStateChanged(user => {
         const loginBtn = document.getElementById('login-btn');
         const userInfo = document.getElementById('user-info');
         const userName = document.getElementById('user-name');
         const userAvatar = document.getElementById('user-avatar');
+        const shutdownBtn = document.getElementById('shutdown-btn');
 
         if (user) {
           loginBtn.style.display = 'none';
           userInfo.style.display = 'flex';
           userName.innerText = user.displayName || user.email;
           if (user.photoURL) userAvatar.src = user.photoURL;
+
+          // Only display the shutdown button for skibidiw63@gmail.com
+          if (user.email && user.email.toLowerCase() === 'skibidiw63@gmail.com') {
+            if (shutdownBtn) shutdownBtn.style.display = 'inline-block';
+          } else {
+            if (shutdownBtn) shutdownBtn.style.display = 'none';
+          }
         } else {
           loginBtn.style.display = 'inline-block';
           userInfo.style.display = 'none';
+          if (shutdownBtn) shutdownBtn.style.display = 'none';
         }
       });
     });
@@ -335,6 +354,7 @@
     <button onclick="showTab('upload-tab')" class="nav-btn">Upload Video</button>
     <button onclick="showTab('fyp-tab')" class="nav-btn">For You</button>
     <button onclick="showTab('schedule')" class="nav-btn">Schedule</button>
+    <button id="shutdown-btn" onclick="shutdownApp()" class="btn btn-red" style="display: none; margin-left: auto;">Shutdown Session</button>
   </nav>
 
   <!-- Main Live Dashboard -->
@@ -365,7 +385,6 @@
 
     <!-- Two-Column Layout -->
     <div class="dashboard-grid">
-      <!-- Left Column: Video Feeds -->
       <div class="video-column">
         <div class="video-card">
           <h3>Your Camera (Streamer)</h3>
@@ -379,7 +398,6 @@
         </div>
       </div>
 
-      <!-- Right Column: Live Chat -->
       <div class="chat-column">
         <div class="chat-card">
           <h3>Live Chat</h3>
@@ -437,6 +455,19 @@
 
       <h3 style="margin-top: 25px;">Upcoming Streams</h3>
       <div id="upcoming-streams-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;"></div>
+    </div>
+  </div>
+
+  <!-- News Ticker Shutdown Overlay -->
+  <div id="shutdown-screen" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 9999; flex-direction: column; justify-content: center; align-items: center;">
+    <div style="font-size: 3rem; font-weight: bold; color: #ff0000; letter-spacing: 4px; margin-bottom: 20px; text-shadow: 0 0 10px #ff0000;">
+      OFF AIR
+    </div>
+
+    <div style="width: 100%; background: #cc0000; color: #ffffff; overflow: hidden; white-space: nowrap; padding: 12px 0; font-family: monospace; font-size: 1.2rem; font-weight: bold; border-top: 3px solid #ff5555; border-bottom: 3px solid #ff5555;">
+      <div class="ticker-text">
+        STREAMKIDS HAS SHUTDOWNED, PLEASE TRY AGAIN WHEN IT IS OPEN &nbsp;&nbsp;•••&nbsp;&nbsp; STREAMKIDS HAS SHUTDOWNED, PLEASE TRY AGAIN WHEN IT IS OPEN &nbsp;&nbsp;•••&nbsp;&nbsp; STREAMKIDS HAS SHUTDOWNED, PLEASE TRY AGAIN WHEN IT IS OPEN
+      </div>
     </div>
   </div>
 
