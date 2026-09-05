@@ -34,6 +34,35 @@
       padding: 20px;
     }
 
+    /* Auth Header Styling */
+    .auth-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #1e1e1e;
+      padding: 12px 20px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+    }
+
+    .auth-bar .brand-title {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #0088ff;
+    }
+
+    .user-profile-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+    }
+
     /* Top Navigation Bar */
     .main-nav {
       display: flex;
@@ -252,9 +281,53 @@
         loadFYP();
       }
     }
+
+    // Google Sign-In Logic
+    function loginWithGoogle() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      firebase.auth().signInWithPopup(provider).catch(err => alert(err.message));
+    }
+
+    // Sign-Out Logic
+    function logoutUser() {
+      firebase.auth().signOut();
+    }
+
+    // Auto update UI on Login State Change
+    window.addEventListener('DOMContentLoaded', () => {
+      firebase.auth().onAuthStateChanged(user => {
+        const loginBtn = document.getElementById('login-btn');
+        const userInfo = document.getElementById('user-info');
+        const userName = document.getElementById('user-name');
+        const userAvatar = document.getElementById('user-avatar');
+
+        if (user) {
+          loginBtn.style.display = 'none';
+          userInfo.style.display = 'flex';
+          userName.innerText = user.displayName || user.email;
+          if (user.photoURL) userAvatar.src = user.photoURL;
+        } else {
+          loginBtn.style.display = 'inline-block';
+          userInfo.style.display = 'none';
+        }
+      });
+    });
   </script>
 </head>
 <body>
+
+  <!-- Top Auth Header Bar -->
+  <div class="auth-bar">
+    <div class="brand-title">StreamKids</div>
+    <div>
+      <button id="login-btn" onclick="loginWithGoogle()" class="btn btn-blue">Sign in with Google</button>
+      <div id="user-info" class="user-profile-info" style="display: none;">
+        <img id="user-avatar" class="user-avatar" src="" alt="Avatar">
+        <span id="user-name"></span>
+        <button onclick="logoutUser()" class="btn btn-red" style="padding: 4px 10px; font-size: 0.8rem;">Log Out</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Top Navigation Bar -->
   <nav class="main-nav">
