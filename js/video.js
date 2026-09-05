@@ -2,14 +2,31 @@
 
 let selectedVideoFile = null;
 
-// Handle File Selection
+// Firebase Instance Helper
+function getFirebaseServices() {
+  const db = window.db || (typeof firebase !== 'undefined' && firebase.firestore ? firebase.firestore() : null);
+  const storage = window.storage || (typeof firebase !== 'undefined' && firebase.storage ? firebase.storage() : null);
+  const auth = window.auth || (typeof firebase !== 'undefined' && firebase.auth ? firebase.auth() : null);
+
+  return { db, storage, auth };
+}
+
+// Handle File Selection (Drag & Drop or File Input)
 function handleFileSelect(event) {
   const file = event.target.files ? event.target.files[0] : (event.dataTransfer ? event.dataTransfer.files[0] : null);
-  
-  if (file && file.type === "video/mp4") {
+
+  if (!file) return;
+
+  const isMp4Type = file.type === "video/mp4";
+  const isMp4Ext = file.name.toLowerCase().endsWith('.mp4');
+
+  if (isMp4Type || isMp4Ext) {
     selectedVideoFile = file;
-    document.getElementById('selected-file-name').innerText = `Selected File: ${file.name}`;
-    document.getElementById('upload-form').style.display = 'block';
+    const nameEl = document.getElementById('selected-file-name');
+    const formEl = document.getElementById('upload-form');
+
+    if (nameEl) nameEl.innerText = `Selected File: ${file.name}`;
+    if (formEl) formEl.style.display = 'block';
   } else {
     alert("Please select or drop a valid MP4 video file.");
   }
@@ -40,79 +57,105 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// Upload Video to Storage & Firestore
+// Upload Video to Firebase Storage & Metadata to Firestore
 async function uploadVideo() {
-  const title = document.getElementById('video-title-input')?.value.trim();
-  const desc = document.getElementById('video-desc-input')?.value.trim();
-  const visibility = document.querySelector('input[name="video-visibility"]:checked')?.value;
+  const titleInput = document.getElementById('video-title-input');
+  const descInput = document.getElementById('video-desc-input');
   const statusEl = document.getElementById('upload-status');
   const uploadBtn = document.getElementById('upload-btn');
+
+  const title = titleInput ? titleInput.value.trim() : "";
+  const desc = descInput ? descInput.value.trim() : "";
+  const visibility = document.querySelector('input[name="video-visibility"]:checked')?.value || 'public';
 
   if (!selectedVideoFile || !title) {
     alert("Please choose an MP4 video file and enter a title.");
     return;
   }
 
-  const dbInstance = window.db;
-  const storageInstance = window.storage;
-  const currentUser = window.auth ? window.auth.currentUser : null;
+  const { db, storage, auth } = getFirebaseServices();
 
-  if (!dbInstance || !storageInstance) {
-    alert("Firebase service is not fully initialized.");
+  if (!db || !storage) {
+    alert("Firebase database or storage service is not initialized properly.");
     return;
   }
 
+  const currentUser = auth ? auth.currentUser : null;
+
   try {
-    uploadBtn.disabled = true;
-    statusEl.innerText = "Uploading video file to Firebase Storage...";
+    if (uploadBtn) uploadBtn.disabled = true;
+    if (statusEl) statusEl.innerText = "Starting upload...";
 
-    // 1. Upload video file to Firebase Storage
-    const fileRef = storageInstance.ref().child(`videos/${Date.now()}_${selectedVideoFile.name}`);
-    const uploadTask = await fileRef.put(selectedVideoFile);
-    const videoUrl = await uploadTask.ref.getDownloadURL();
+    // 1. Upload video file to Firebase Storage with Progress
+    const storageRef = storage.ref().child(`videos/${Date.now()}_${selectedVideoFile.name}`);
+    const uploadTask = storageRef.put(selectedVideoFile);
 
-    statusEl.innerText = "Saving video metadata to database...";
+    await new Promise((resolve, reject) => {
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+          if (statusEl) statusEl.innerText = `Uploading video: ${progress}%`;
+        },
+        (error) => reject(error),
+        () => resolve()
+      );
+    });
+
+    if (statusEl) statusEl.innerText = "Saving video details...";
+    const videoUrl = await uploadTask.snapshot.ref.getDownloadURL();
 
     // 2. Save metadata to Firestore
-    await dbInstance.collection('videos').add({
+    const authorName = currentUser && currentUser.email ? currentUser.email.split('@')[0] : "Guest User";
+
+    await db.collection('videos').add({
       title: title,
-      description: desc || "",
+      description: desc,
       videoUrl: videoUrl,
       visibility: visibility,
-      author: currentUser && currentUser.email ? currentUser.email.split('@')[0] : "Guest User",
+      author: authorName,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    statusEl.innerText = "Upload complete!";
+    if (statusEl) statusEl.innerText = "Upload complete!";
     alert("Your video was successfully uploaded!");
 
     // Reset Form
     selectedVideoFile = null;
-    document.getElementById('selected-file-name').innerText = '';
-    document.getElementById('video-title-input').value = '';
-    document.getElementById('video-desc-input').value = '';
-    document.getElementById('upload-form').style.display = 'none';
-    uploadBtn.disabled = false;
+    if (document.getElementById('selected-file-name')) document.getElementById('selected-file-name').innerText = '';
+    if (titleInput) titleInput.value = '';
+    if (descInput) descInput.value = '';
+    
+    const fileInput = document.getElementById('video-file-input');
+    if (fileInput) fileInput.value = '';
+
+    const formEl = document.getElementById('upload-form');
+    if (formEl) formEl.style.display = 'none';
 
   } catch (err) {
     console.error("Video Upload Error:", err);
-    statusEl.innerText = "Error uploading video. See console for details.";
-    uploadBtn.disabled = false;
+    if (statusEl) statusEl.innerText = "Error uploading video. See console for details.";
+  } finally {
+    if (uploadBtn) uploadBtn.disabled = false;
   }
 }
 
 // Load Random Public Videos for "For You Page"
 async function loadFYP() {
   const fypContainer = document.getElementById('fyp-container');
-  const dbInstance = window.db;
+  const { db } = getFirebaseServices();
 
-  if (!fypContainer || !dbInstance) return;
+  if (!fypContainer) return;
+  if (!db) {
+    fypContainer.innerHTML = '<p style="color: #aaa;">Database not available.</p>';
+    return;
+  }
 
   fypContainer.innerHTML = '<p style="color: #aaa;">Loading videos...</p>';
 
   try {
-    // Retrieve only public videos
-    const snapshot = await dbInstance.collection('videos')
+    // Retrieve public videos
+    const snapshot = await db.collection('videos')
       .where('visibility', '==', 'public')
       .limit(30)
       .get();
@@ -123,9 +166,9 @@ async function loadFYP() {
     }
 
     let videos = [];
-    snapshot.forEach(doc => videos.push(doc.data()));
+    snapshot.forEach(doc => videos.push({ id: doc.id, ...doc.data() }));
 
-    // Fisher-Yates random shuffle algorithm
+    // Fisher-Yates shuffle algorithm for random order
     for (let i = videos.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [videos[i], videos[j]] = [videos[j], videos[i]];
@@ -133,15 +176,20 @@ async function loadFYP() {
 
     fypContainer.innerHTML = '';
 
-    // Render video items
+    // Render video cards
     videos.forEach((vid) => {
       const card = document.createElement('div');
-      card.style.cssText = "background: #181818; padding: 15px; border-radius: 8px; border: 1px solid #2a2a2a;";
+      card.style.cssText = "background: #181818; padding: 15px; border-radius: 8px; border: 1px solid #2a2a2a; margin-bottom: 15px;";
+      
+      const safeTitle = vid.title || "Untitled Video";
+      const safeAuthor = vid.author || "Guest User";
+      const safeDesc = vid.description || "";
+
       card.innerHTML = `
-        <h3 style="margin: 0 0 5px 0; color: #00ffcc;">${vid.title}</h3>
-        <p style="font-size: 0.85em; color: #aaa; margin: 0 0 10px 0;">Posted by @${vid.author}</p>
-        <video src="${vid.videoUrl}" controls style="width: 100%; max-height: 400px; border-radius: 6px; background: #000;"></video>
-        ${vid.description ? `<p style="margin-top: 10px; font-size: 0.9em; color: #ddd;">${vid.description}</p>` : ''}
+        <h3 style="margin: 0 0 5px 0; color: #00ffcc;">${safeTitle}</h3>
+        <p style="font-size: 0.85em; color: #aaa; margin: 0 0 10px 0;">Posted by @${safeAuthor}</p>
+        <video src="${vid.videoUrl}" controls preload="metadata" style="width: 100%; max-height: 400px; border-radius: 6px; background: #000;"></video>
+        ${safeDesc ? `<p style="margin-top: 10px; font-size: 0.9em; color: #ddd;">${safeDesc}</p>` : ''}
       `;
       fypContainer.appendChild(card);
     });
