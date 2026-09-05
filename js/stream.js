@@ -6,11 +6,12 @@ let chatUnsubscribe = null;
 let viewerUnsubscribe = null;
 let currentViewerDocId = null;
 let heartbeatInterval = null;
+let currentCall = null;
 
 // Helper to safely obtain the database instance
 function getDb() {
   if (window.db) return window.db;
-  if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+  if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
     window.db = firebase.firestore();
     return window.db;
   }
@@ -42,7 +43,7 @@ async function getMicrophones() {
 
 // Initialize PeerJS Connection
 function initPeer() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (peer && currentPeerId) {
       resolve(currentPeerId);
       return;
@@ -65,6 +66,7 @@ function initPeer() {
     });
 
     peer.on('call', (call) => {
+      currentCall = call;
       call.answer(localStream);
       call.on('stream', (remoteStream) => {
         const remoteVideo = document.getElementById('remote-webcam');
@@ -72,7 +74,10 @@ function initPeer() {
       });
     });
 
-    peer.on('error', (err) => console.error("PeerJS Error:", err));
+    peer.on('error', (err) => {
+      console.error("PeerJS Error:", err);
+      reject(err);
+    });
   });
 }
 
@@ -169,9 +174,11 @@ async function searchAndWatchStream() {
     await initPeer();
 
     const options = { constraints: { offerToReceiveAudio: true, offerToReceiveVideo: true } };
-    const call = peer.call(targetPeerId, localStream || new MediaStream(), options);
+    if (currentCall) currentCall.close();
+    
+    currentCall = peer.call(targetPeerId, localStream || new MediaStream(), options);
 
-    call.on('stream', (remoteStream) => {
+    currentCall.on('stream', (remoteStream) => {
       const remoteVideo = document.getElementById('remote-webcam');
       if (remoteVideo) {
         remoteVideo.srcObject = remoteStream;
@@ -247,10 +254,17 @@ async function stopMyStream() {
   }
 
   const localVideo = document.getElementById('my-webcam');
+  const remoteVideo = document.getElementById('remote-webcam');
   if (localVideo) localVideo.srcObject = null;
+  if (remoteVideo) remoteVideo.srcObject = null;
 
-  if (chatUnsubscribe) chatUnsubscribe();
-  if (viewerUnsubscribe) viewerUnsubscribe();
+  if (chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; }
+  if (viewerUnsubscribe) { viewerUnsubscribe(); viewerUnsubscribe = null; }
+
+  if (currentCall) {
+    currentCall.close();
+    currentCall = null;
+  }
 
   if (peer) {
     peer.destroy();
@@ -262,6 +276,7 @@ async function stopMyStream() {
   const vCount = document.getElementById('viewer-count');
   if (vCount) vCount.innerText = "0";
 
+  activeStreamTitle = "";
   console.log("Stream stopped.");
 }
 
@@ -437,13 +452,9 @@ async function loadScheduledStreams() {
   }
 }
 
-// ==========================================
-// GLOBAL SHUTDOWN SYSTEM (FIRESTORE BACKED)
-// ==========================================
-
-// Writes true to Firestore globally
+// Shutdown and Restore Logic
 async function shutdownApp() {
-  const user = firebase.auth().currentUser;
+  const user = firebase.auth ? firebase.auth().currentUser : null;
 
   if (!user || !user.email || user.email.toLowerCase() !== 'skibidiw63@gmail.com') {
     alert("Access denied. Only the administrator can shut down StreamKids.");
@@ -467,7 +478,6 @@ async function shutdownApp() {
   }
 }
 
-// Resets Firestore state to allow everyone back
 async function restoreApp() {
   const dbInstance = getDb();
   if (!dbInstance) return;
@@ -484,24 +494,8 @@ async function restoreApp() {
   }
 }
 
-// Executed by EVERY user locally when Firestore reports isShutdown: true
 function executeLocalShutdown() {
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-    window.localStream = null;
-  }
-
-  const myVideo = document.getElementById('my-webcam');
-  const remoteVideo = document.getElementById('remote-webcam');
-  if (myVideo) myVideo.srcObject = null;
-  if (remoteVideo) remoteVideo.srcObject = null;
-
-  if (peer) {
-    peer.destroy();
-    peer = null;
-    window.peer = null;
-  }
+  stopMyStream();
 
   const shutdownScreen = document.getElementById('shutdown-screen');
   if (shutdownScreen) {
@@ -509,14 +503,12 @@ function executeLocalShutdown() {
   }
 }
 
-// Key listener to restore app (Ctrl + Shift + R)
 window.addEventListener('keydown', (event) => {
   if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'r') {
     restoreApp();
   }
 });
 
-// Real-Time Listener attached on startup
 document.addEventListener('DOMContentLoaded', () => {
   getMicrophones();
 
