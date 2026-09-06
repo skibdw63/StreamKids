@@ -423,7 +423,7 @@
       if (user && user.email && user.email.toLowerCase() === ADMIN_EMAIL) {
         firebase.firestore().collection('system').doc('status').set({ 
           isCrashed: true,
-          crashReason: "Error: Admin forced emergency system crash sequence (Manual Trigger)."
+          crashReason: "Error: Unhandled System Exception (0x80004005) - Core WebRTC Buffer Overflow"
         }, { merge: true })
         .then(() => console.log("System crash triggered globally."))
         .catch((err) => alert("Error triggering crash: " + err.message));
