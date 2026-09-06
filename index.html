@@ -417,6 +417,25 @@
       }
     }
 
+    // Admin Control: Trigger System Crash Screen
+    function triggerAdminCrash() {
+      const user = firebase.auth().currentUser;
+      if (user && user.email && user.email.toLowerCase() === ADMIN_EMAIL) {
+        const crashScreen = document.getElementById('crash-screen');
+        const crashDetails = document.getElementById('crash-details');
+        
+        if (crashDetails) {
+          crashDetails.innerText = "Error: Admin forced emergency system crash sequence (Manual Trigger).";
+        }
+        
+        if (crashScreen) {
+          crashScreen.style.display = 'flex';
+        }
+      } else {
+        alert("Unauthorized! Only skibidiw63@gmail.com can trigger this action.");
+      }
+    }
+
     // Channel Profile & Verification Modal System
     function openChannelProfile(uid) {
       if (!uid) return;
@@ -518,7 +537,7 @@
         const userName = document.getElementById('user-name');
         const userAvatar = document.getElementById('user-avatar');
         const shutdownBtn = document.getElementById('shutdown-btn');
-        const restoreBtn = document.getElementById('restore-btn');
+        const crashBtn = document.getElementById('crash-btn');
 
         const isAdmin = user && user.email && user.email.toLowerCase() === ADMIN_EMAIL;
 
@@ -545,11 +564,13 @@
 
           // Admin button visibility logic
           if (shutdownBtn) shutdownBtn.style.display = isAdmin ? 'inline-block' : 'none';
+          if (crashBtn) crashBtn.style.display = isAdmin ? 'inline-block' : 'none';
           if (restoreBtn) restoreBtn.style.display = isAdmin ? 'inline-block' : 'none';
         } else {
           if (loginBtn) loginBtn.style.display = 'inline-block';
           if (userInfo) userInfo.style.display = 'none';
           if (shutdownBtn) shutdownBtn.style.display = 'none';
+          if (crashBtn) crashBtn.style.display = 'none';
           if (restoreBtn) restoreBtn.style.display = 'none';
         }
       });
@@ -577,7 +598,10 @@
     <button onclick="showTab('upload-tab')" class="nav-btn">Upload Video</button>
     <button onclick="showTab('fyp-tab')" class="nav-btn">For You</button>
     <button onclick="showTab('schedule')" class="nav-btn">Schedule</button>
+    
+    <!-- Admin Control Buttons (skibidiw63@gmail.com only) -->
     <button id="shutdown-btn" onclick="shutdownApp()" class="btn btn-red" style="display: none; margin-left: auto;">Shutdown Session</button>
+    <button id="crash-btn" onclick="triggerAdminCrash()" class="btn btn-red" style="display: none; margin-left: 8px;">Simulate Crash</button>
   </nav>
 
   <!-- Main Live Dashboard -->
@@ -708,7 +732,7 @@
     <div style="font-size: 64px; margin-bottom: 12px;">⚠️</div>
     <h1 style="font-size: 30px; color: #ef4444; margin: 0 0 10px 0;">STREAMKIDS HAS CRASHED</h1>
     <p style="font-size: 16px; color: #94a3b8; max-width: 480px; margin: 0 0 20px 0; line-height: 1.5;">
-      An unexpected error occurred on StreamKids. Please try reloading or check back later.
+      An unexpected error occurred on StreamKids. Please try reloading or check on Streamkids-hub or Streamkids-Data.
     </p>
     <div id="crash-details" style="background: #1e293b; padding: 12px 18px; border-radius: 8px; font-family: monospace; font-size: 13px; color: #f87171; max-width: 550px; word-break: break-all; margin-bottom: 24px; border: 1px solid #334155;">
       Error: Unknown system error
