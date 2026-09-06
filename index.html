@@ -19,6 +19,7 @@
   <script src="js/firebase-config.js"></script>
   <script src="js/stream.js"></script>
   <script src="js/video.js"></script>
+  <script src="js/app-ui.js"></script>
 
   <style>
     * {
@@ -700,6 +701,21 @@
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- StreamKids System Crash Screen Overlay -->
+  <div id="crash-screen" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0f172a; color: #ffffff; z-index: 99999; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-family: system-ui, -apple-system, sans-serif; padding: 20px; box-sizing: border-box;">
+    <div style="font-size: 64px; margin-bottom: 12px;">⚠️</div>
+    <h1 style="font-size: 30px; color: #ef4444; margin: 0 0 10px 0;">STREAMKIDS HAS CRASHED</h1>
+    <p style="font-size: 16px; color: #94a3b8; max-width: 480px; margin: 0 0 20px 0; line-height: 1.5;">
+      An unexpected error occurred on StreamKids. Please try reloading or check back later.
+    </p>
+    <div id="crash-details" style="background: #1e293b; padding: 12px 18px; border-radius: 8px; font-family: monospace; font-size: 13px; color: #f87171; max-width: 550px; word-break: break-all; margin-bottom: 24px; border: 1px solid #334155;">
+      Error: Unknown system error
+    </div>
+    <button onclick="location.reload()" style="background: #0284c7; color: white; border: none; padding: 12px 24px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer;">
+      Reload StreamKids
+    </button>
   </div>
 
   <!-- News Ticker Shutdown Overlay -->
