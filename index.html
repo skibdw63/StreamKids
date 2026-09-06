@@ -397,7 +397,7 @@
     function shutdownApp() {
       const user = firebase.auth().currentUser;
       if (user && user.email && user.email.toLowerCase() === ADMIN_EMAIL) {
-        firebase.firestore().collection('system').doc('status').set({ isShutdown: true })
+        firebase.firestore().collection('system').doc('status').set({ isShutdown: true }, { merge: true })
           .then(() => console.log("System shut down globally."))
           .catch((err) => alert("Error triggering shutdown: " + err.message));
       } else {
@@ -409,7 +409,7 @@
     function restoreApp() {
       const user = firebase.auth().currentUser;
       if (user && user.email && user.email.toLowerCase() === ADMIN_EMAIL) {
-        firebase.firestore().collection('system').doc('status').set({ isShutdown: false })
+        firebase.firestore().collection('system').doc('status').set({ isShutdown: false }, { merge: true })
           .then(() => console.log("System restored globally."))
           .catch((err) => alert("Error restoring system: " + err.message));
       } else {
@@ -417,22 +417,32 @@
       }
     }
 
-    // Admin Control: Trigger System Crash Screen
+    // Admin Control: Trigger System Crash Globally via Firestore
     function triggerAdminCrash() {
       const user = firebase.auth().currentUser;
       if (user && user.email && user.email.toLowerCase() === ADMIN_EMAIL) {
-        const crashScreen = document.getElementById('crash-screen');
-        const crashDetails = document.getElementById('crash-details');
-        
-        if (crashDetails) {
-          crashDetails.innerText = "Error: Admin forced emergency system crash sequence (Manual Trigger).";
-        }
-        
-        if (crashScreen) {
-          crashScreen.style.display = 'flex';
-        }
+        firebase.firestore().collection('system').doc('status').set({ 
+          isCrashed: true,
+          crashReason: "Error: Admin forced emergency system crash sequence (Manual Trigger)."
+        }, { merge: true })
+        .then(() => console.log("System crash triggered globally."))
+        .catch((err) => alert("Error triggering crash: " + err.message));
       } else {
         alert("Unauthorized! Only skibidiw63@gmail.com can trigger this action.");
+      }
+    }
+
+    // Admin Control: Clear Crash Globally
+    function resolveCrash() {
+      const user = firebase.auth().currentUser;
+      if (user && user.email && user.email.toLowerCase() === ADMIN_EMAIL) {
+        firebase.firestore().collection('system').doc('status').set({ 
+          isCrashed: false 
+        }, { merge: true })
+        .then(() => console.log("Crash status cleared globally."))
+        .catch((err) => alert("Error resolving crash: " + err.message));
+      } else {
+        location.reload();
       }
     }
 
@@ -516,21 +526,41 @@
     window.addEventListener('DOMContentLoaded', () => {
       const db = firebase.firestore();
 
-      // 1. Sync Shutdown Overlay Live across ALL users
+      // 1. Sync Crash & Shutdown Overlays Live across ALL users
       db.collection('system').doc('status').onSnapshot((doc) => {
+        const crashOverlay = document.getElementById('crash-screen');
+        const crashDetails = document.getElementById('crash-details');
         const shutdownOverlay = document.getElementById('shutdown-screen');
-        if (shutdownOverlay) {
-          if (doc.exists && doc.data().isShutdown === true) {
-            shutdownOverlay.style.display = 'flex';
-          } else {
-            shutdownOverlay.style.display = 'none';
+
+        if (doc.exists) {
+          const data = doc.data();
+
+          // Real-time Global Crash State
+          if (crashOverlay) {
+            if (data.isCrashed === true) {
+              if (crashDetails && data.crashReason) {
+                crashDetails.innerText = data.crashReason;
+              }
+              crashOverlay.style.display = 'flex';
+            } else {
+              crashOverlay.style.display = 'none';
+            }
+          }
+
+          // Real-time Global Shutdown State
+          if (shutdownOverlay) {
+            if (data.isShutdown === true) {
+              shutdownOverlay.style.display = 'flex';
+            } else {
+              shutdownOverlay.style.display = 'none';
+            }
           }
         }
       }, (error) => {
-        console.error("Error monitoring shutdown status:", error);
+        console.error("Error monitoring system status:", error);
       });
 
-      // 2. Auth State Listener (Controls Admin Buttons, User Profile Sync & Info)
+      // 2. Auth State Listener
       firebase.auth().onAuthStateChanged(user => {
         const loginBtn = document.getElementById('login-btn');
         const userInfo = document.getElementById('user-info');
@@ -538,6 +568,7 @@
         const userAvatar = document.getElementById('user-avatar');
         const shutdownBtn = document.getElementById('shutdown-btn');
         const crashBtn = document.getElementById('crash-btn');
+        const restoreBtn = document.getElementById('restore-btn');
 
         const isAdmin = user && user.email && user.email.toLowerCase() === ADMIN_EMAIL;
 
@@ -737,8 +768,8 @@
     <div id="crash-details" style="background: #1e293b; padding: 12px 18px; border-radius: 8px; font-family: monospace; font-size: 13px; color: #f87171; max-width: 550px; word-break: break-all; margin-bottom: 24px; border: 1px solid #334155;">
       Error: Unknown system error
     </div>
-    <button onclick="location.reload()" style="background: #0284c7; color: white; border: none; padding: 12px 24px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer;">
-      Reload StreamKids
+    <button onclick="resolveCrash()" style="background: #0284c7; color: white; border: none; padding: 12px 24px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer;">
+      Reload / Resolve StreamKids
     </button>
   </div>
 
