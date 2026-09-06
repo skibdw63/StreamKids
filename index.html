@@ -12,6 +12,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <!-- PeerJS WebRTC Library -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
@@ -372,6 +375,11 @@
     let currentSelectedUid = null;
     let currentSelectedUserVerified = false;
 
+    // Supabase Initialization
+    const SUPABASE_URL = 'https://dyanandcqxywovnftghp.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_cKP7iQeVTcG3MAeTNg4N5g_j18Y_5mN';
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     // Tab Switching Helper
     function showTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
@@ -391,6 +399,73 @@
 
     function logoutUser() {
       firebase.auth().signOut();
+    }
+
+    // Upload Video using Supabase Storage & Firebase Firestore
+    async function uploadVideo() {
+      const fileInput = document.getElementById('video-file-input');
+      const titleInput = document.getElementById('video-title-input').value;
+      const descInput = document.getElementById('video-desc-input').value;
+      const visibilityInput = document.querySelector('input[name="video-visibility"]:checked').value;
+      const statusEl = document.getElementById('upload-status');
+      const user = firebase.auth().currentUser;
+
+      if (!fileInput.files.length) {
+        alert("Please select a video file first!");
+        return;
+      }
+
+      if (!titleInput) {
+        alert("Please enter a video title!");
+        return;
+      }
+
+      const file = fileInput.files[0];
+      const filePath = `public/${Date.now()}_${file.name}`;
+      statusEl.innerText = "Uploading video to Supabase Storage...";
+
+      try {
+        // 1. Upload to Supabase Bucket 'streamkids-videos'
+        const { data: uploadData, error: uploadError } = await supabaseClient.storage
+          .from('streamkids-videos')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          throw new Error("Supabase Upload Error: " + uploadError.message);
+        }
+
+        // 2. Get Public URL from Supabase
+        const { data: publicUrlData } = supabaseClient.storage
+          .from('streamkids-videos')
+          .getPublicUrl(filePath);
+
+        const videoPublicUrl = publicUrlData.publicUrl;
+        statusEl.innerText = "Saving video details to Firebase...";
+
+        // 3. Save Metadata to Firebase Firestore
+        await firebase.firestore().collection('videos').add({
+          title: titleInput,
+          description: descInput,
+          visibility: visibilityInput,
+          videoUrl: videoPublicUrl,
+          uploaderUid: user ? user.uid : 'anonymous',
+          uploaderName: user ? (user.displayName || user.email) : 'Anonymous',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        statusEl.innerText = "Video published successfully!";
+        statusEl.style.color = "#00ffcc";
+
+        // Reset inputs
+        document.getElementById('video-title-input').value = '';
+        document.getElementById('video-desc-input').value = '';
+        document.getElementById('upload-form').style.display = 'none';
+        fileInput.value = '';
+      } catch (err) {
+        console.error("Upload error:", err);
+        statusEl.innerText = err.message;
+        statusEl.style.color = "#ff5555";
+      }
     }
 
     // Admin Control: Trigger Shutdown via Firestore
