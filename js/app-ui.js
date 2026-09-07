@@ -2,7 +2,9 @@
 function showTab(tabId) {
   document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
   const target = document.getElementById(tabId);
-  if (target) target.style.display = 'block';
+  if (target) {
+    target.style.display = 'block';
+  }
 
   // Automatically load the feed when switching to the FYP tab
   if (tabId === 'fyp-tab') {
@@ -248,13 +250,41 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// Live Stream Placeholders
-function startMyStream() {
+// Live Stream Handlers with Media Capture
+async function startMyStream() {
   console.log("Starting stream...");
+  
+  const videoElement = document.getElementById('my-stream-video') 
+                    || document.getElementById('live-preview') 
+                    || document.querySelector('video');
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    
+    if (videoElement) {
+      videoElement.srcObject = stream;
+      videoElement.play();
+    }
+    
+    alert("Live stream started!");
+  } catch (err) {
+    console.error("Error accessing camera/microphone:", err);
+    alert("Could not start stream. Please check camera permissions in your browser.");
+  }
 }
 
 function stopMyStream() {
   console.log("Stopping stream...");
+  const videoElement = document.getElementById('my-stream-video') 
+                    || document.getElementById('live-preview') 
+                    || document.querySelector('video');
+
+  if (videoElement && videoElement.srcObject) {
+    const tracks = videoElement.srcObject.getTracks();
+    tracks.forEach(track => track.stop());
+    videoElement.srcObject = null;
+    alert("Stream stopped.");
+  }
 }
 
 function searchAndWatchStream() {
@@ -290,3 +320,20 @@ function scheduleStream() {
     alert(`Stream scheduled: ${title} at ${time}`);
   }
 }
+
+// Explicitly export all functions to window to prevent scope & inline click issues
+window.showTab = showTab;
+window.loginWithGoogle = loginWithGoogle;
+window.logoutUser = logoutUser;
+window.loadFYP = loadFYP;
+window.openChannelProfile = openChannelProfile;
+window.uploadProfilePicture = uploadProfilePicture;
+window.editChannelDetails = editChannelDetails;
+window.manageVideos = manageVideos;
+window.toggleSubscribe = toggleSubscribe;
+window.startMyStream = startMyStream;
+window.stopMyStream = stopMyStream;
+window.searchAndWatchStream = searchAndWatchStream;
+window.sendChatMessage = sendChatMessage;
+window.handleFileSelect = handleFileSelect;
+window.scheduleStream = scheduleStream;
