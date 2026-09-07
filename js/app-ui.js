@@ -55,7 +55,7 @@ async function loadFYP() {
       card.innerHTML = `
         <h3 style="color: #00ffcc; margin-bottom: 4px;">${escapeHtml(data.title || 'Untitled')}</h3>
         <p style="color: #aaaaaa; font-size: 0.9rem; margin-bottom: 10px;">
-          Posted by <span onclick="event.stopPropagation(); openChannelProfile('${uploaderUid}')" style="color: #0088ff; cursor: pointer; font-weight: bold;">@${escapeHtml(authorName)}</span>
+          Posted by <span onclick="event.stopPropagation(); renderChannelProfile('${uploaderUid}')" style="color: #0088ff; cursor: pointer; font-weight: bold;">@${escapeHtml(authorName)}</span>
         </p>
         <video src="${data.videoUrl}" controls style="width: 100%; max-height: 400px; background: #000; border-radius: 6px;"></video>
         ${data.description ? `<p style="margin-top: 8px; color: #dddddd;">${escapeHtml(data.description)}</p>` : ''}
@@ -69,8 +69,8 @@ async function loadFYP() {
   }
 }
 
-// Channel Profile View (Owner vs Viewer Controls)
-async function openChannelProfile(targetUid) {
+// Channel Profile View (Renamed to renderChannelProfile to bypass name collisions)
+async function renderChannelProfile(targetUid) {
   const profileContainer = document.getElementById('profile-container');
   if (!profileContainer) return;
 
