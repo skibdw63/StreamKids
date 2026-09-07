@@ -45,8 +45,8 @@ async function loadFYP() {
       const data = doc.data();
 
       // Uses uploaderName from the Firestore document
-      const authorName = data.uploaderName || 'Guest User';
-      const uploaderUid = data.uploaderUid || '';
+      const authorName = data.uploaderName || data.userName || 'Guest User';
+      const uploaderUid = data.uploaderUid || data.userId || data.uid || data.authorId || '';
 
       const card = document.createElement('div');
       card.className = 'video-card';
@@ -108,11 +108,25 @@ async function openChannelProfile(targetUid) {
 
     const bio = userData.bio || 'Welcome to my official channel!';
 
-    // 2. Fetch user's uploaded videos directly by uploaderUid
-    const videosSnapshot = await firebase.firestore()
+    // 2. Fetch user's uploaded videos with field fallbacks
+    let videosSnapshot = await firebase.firestore()
       .collection('videos')
       .where('uploaderUid', '==', targetUid)
       .get();
+
+    // Fallback search if 'uploaderUid' field name differs in older records
+    if (videosSnapshot.empty) {
+      videosSnapshot = await firebase.firestore()
+        .collection('videos')
+        .where('userId', '==', targetUid)
+        .get();
+    }
+    if (videosSnapshot.empty) {
+      videosSnapshot = await firebase.firestore()
+        .collection('videos')
+        .where('uid', '==', targetUid)
+        .get();
+    }
 
     let videoCardsHtml = '';
     if (videosSnapshot.empty) {
