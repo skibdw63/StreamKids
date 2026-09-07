@@ -46,6 +46,7 @@ async function loadFYP() {
 
       // Uses uploaderName from the Firestore document
       const authorName = data.uploaderName || 'Guest User';
+      const uploaderUid = data.uploaderUid || '';
 
       const card = document.createElement('div');
       card.className = 'video-card';
@@ -54,7 +55,7 @@ async function loadFYP() {
       card.innerHTML = `
         <h3 style="color: #00ffcc; margin-bottom: 4px;">${escapeHtml(data.title || 'Untitled')}</h3>
         <p style="color: #aaaaaa; font-size: 0.9rem; margin-bottom: 10px;">
-          Posted by <span onclick="openChannelProfile('${data.uploaderUid}')" style="color: #0088ff; cursor: pointer; font-weight: bold;">@${escapeHtml(authorName)}</span>
+          Posted by <span onclick="openChannelProfile('${uploaderUid}')" style="color: #0088ff; cursor: pointer; font-weight: bold;">@${escapeHtml(authorName)}</span>
         </p>
         <video src="${data.videoUrl}" controls style="width: 100%; max-height: 400px; background: #000; border-radius: 6px;"></video>
         ${data.description ? `<p style="margin-top: 8px; color: #dddddd;">${escapeHtml(data.description)}</p>` : ''}
@@ -73,6 +74,17 @@ async function openChannelProfile(targetUid) {
   const profileContainer = document.getElementById('profile-container');
   if (!profileContainer) return;
 
+  // Handle case where targetUid is missing or 'undefined' string
+  if (!targetUid || targetUid === 'undefined') {
+    profileContainer.innerHTML = `
+      <div style="padding: 20px; color: #ff5555; text-align: center;">
+        <h3>Channel Not Found</h3>
+        <p style="color: #aaa;">This video was uploaded without a valid user ID attached.</p>
+      </div>`;
+    showTab('profile-tab');
+    return;
+  }
+
   const currentUser = firebase.auth().currentUser;
   const isOwner = currentUser && currentUser.uid === targetUid;
 
@@ -87,7 +99,13 @@ async function openChannelProfile(targetUid) {
 
     const displayName = userData.displayName || 'StreamKids Creator';
     const handle = userData.handle || `@user_${targetUid.substring(0, 5)}`;
-    const avatarUrl = userData.avatarUrl || 'https://via.placeholder.com/150';
+    
+    // Ensure avatarUrl falls back safely to default placeholder image
+    let avatarUrl = userData.avatarUrl;
+    if (!avatarUrl || avatarUrl.includes('apppicture.png')) {
+      avatarUrl = 'https://via.placeholder.com/150';
+    }
+
     const bio = userData.bio || 'Welcome to my official channel!';
 
     // 2. Fetch user's uploaded videos directly by uploaderUid
@@ -114,11 +132,11 @@ async function openChannelProfile(targetUid) {
       });
     }
 
-    // 3. Render Profile (Owner view gets action buttons + editable picture)
+    // 3. Render Profile
     profileContainer.innerHTML = `
       <div style="padding: 20px; color: #fff;">
         <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
-          <!-- Profile Picture with broken image fallback -->
+          <!-- Profile Picture with fallback -->
           <div style="position: relative;">
             <img id="profile-avatar-img" 
                  src="${avatarUrl}" 
@@ -135,7 +153,7 @@ async function openChannelProfile(targetUid) {
             <p style="margin: 4px 0; color: #aaa;">${escapeHtml(handle)}</p>
             <p style="margin: 4px 0; color: #ddd; font-size: 0.9rem;">${escapeHtml(bio)}</p>
 
-            <!-- Action Buttons: Show Customize/Manage buttons if owner, Subscribe button if viewer -->
+            <!-- Action Buttons -->
             <div style="margin-top: 12px; display: flex; gap: 10px;">
               ${isOwner ? `
                 <button onclick="editChannelDetails()" style="padding: 8px 16px; background: #333; color: #fff; border: 1px solid #555; border-radius: 20px; cursor: pointer;">Customize channel</button>
