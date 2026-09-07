@@ -44,7 +44,7 @@ async function loadFYP() {
     snapshot.forEach(doc => {
       const data = doc.data();
 
-      // Uses uploaderName from the Firestore document (e.g. "Skibidi What")
+      // Uses uploaderName from the Firestore document
       const authorName = data.uploaderName || 'Guest User';
 
       const card = document.createElement('div');
@@ -81,7 +81,7 @@ async function openChannelProfile(targetUid) {
   profileContainer.innerHTML = '<p style="color: #aaa;">Loading channel...</p>';
 
   try {
-    // 1. Fetch channel owner data
+    // 1. Fetch channel owner profile data from Firestore
     const userDoc = await firebase.firestore().collection('users').doc(targetUid).get();
     const userData = userDoc.exists ? userDoc.data() : {};
 
@@ -90,11 +90,10 @@ async function openChannelProfile(targetUid) {
     const avatarUrl = userData.avatarUrl || 'https://via.placeholder.com/150';
     const bio = userData.bio || 'Welcome to my official channel!';
 
-    // 2. Fetch user's uploaded videos
+    // 2. Fetch user's uploaded videos directly by uploaderUid
     const videosSnapshot = await firebase.firestore()
       .collection('videos')
       .where('uploaderUid', '==', targetUid)
-      .where('visibility', '==', 'public')
       .get();
 
     let videoCardsHtml = '';
@@ -107,9 +106,10 @@ async function openChannelProfile(targetUid) {
       videosSnapshot.forEach(doc => {
         const v = doc.data();
         videoCardsHtml += `
-          <div style="width: 200px; display: inline-block; margin: 10px; text-align: left;">
-            <video src="${v.videoUrl}" controls style="width: 100%; height: 120px; border-radius: 8px; object-fit: cover;"></video>
-            <p style="font-weight: bold; margin: 5px 0 2px; color: #fff;">${escapeHtml(v.title || 'Untitled')}</p>
+          <div style="width: 220px; margin: 10px; display: inline-block; text-align: left; background: #181818; padding: 10px; border-radius: 8px;">
+            <video src="${v.videoUrl}" controls style="width: 100%; height: 130px; border-radius: 6px; object-fit: cover; background: #000;"></video>
+            <p style="font-weight: bold; margin: 8px 0 2px; color: #fff; font-size: 0.95rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(v.title || 'Untitled')}</p>
+            ${v.description ? `<p style="color: #aaa; font-size: 0.8rem; margin: 0; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(v.description)}</p>` : ''}
           </div>`;
       });
     }
@@ -118,11 +118,14 @@ async function openChannelProfile(targetUid) {
     profileContainer.innerHTML = `
       <div style="padding: 20px; color: #fff;">
         <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
-          <!-- Profile Picture (Editable only for channel owner) -->
+          <!-- Profile Picture with broken image fallback -->
           <div style="position: relative;">
-            <img id="profile-avatar-img" src="${avatarUrl}" style="width: 110px; height: 110px; border-radius: 50%; object-fit: cover; border: 2px solid #333;" />
+            <img id="profile-avatar-img" 
+                 src="${avatarUrl}" 
+                 onerror="this.onerror=null;this.src='https://via.placeholder.com/150';" 
+                 style="width: 110px; height: 110px; border-radius: 50%; object-fit: cover; border: 2px solid #333; background: #222;" />
             ${isOwner ? `
-              <button onclick="document.getElementById('avatar-file-input').click()" style="position: absolute; bottom: 0; right: 0; background: #0088ff; border: none; color: #fff; border-radius: 50%; width: 32px; height: 32px; cursor: pointer;" title="Change Picture">📷</button>
+              <button onclick="document.getElementById('avatar-file-input').click()" style="position: absolute; bottom: 0; right: 0; background: #0088ff; border: none; color: #fff; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Change Picture">📷</button>
               <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="uploadProfilePicture(event, '${targetUid}')" />
             ` : ''}
           </div>
@@ -148,8 +151,8 @@ async function openChannelProfile(targetUid) {
 
         <!-- Videos Section -->
         <div>
-          <h3>Uploaded Videos</h3>
-          <div style="display: flex; flex-wrap: wrap;">${videoCardsHtml}</div>
+          <h3 style="margin-bottom: 15px;">Uploaded Videos</h3>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px;">${videoCardsHtml}</div>
         </div>
       </div>
     `;
