@@ -290,3 +290,6 @@ function scheduleStream() {
     alert(`Stream scheduled: ${title} at ${time}`);
   }
 }
+// Force window to use this profile function globally
+window.renderChannelProfile = renderChannelProfile;
+window.openChannelProfile = renderChannelProfile;
