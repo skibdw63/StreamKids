@@ -32,8 +32,9 @@ async function getMicrophones() {
     audioInputs.forEach((device, index) => {
       const option = document.createElement('option');
       option.value = device.deviceId;
-      option.text = device.label || `Microphone ${index + 1}`;
-      if (device.label.toLowerCase().includes('camo')) option.selected = true;
+      const label = device.label || `Microphone ${index + 1}`;
+      option.text = label;
+      if (label.toLowerCase().includes('camo')) option.selected = true;
       micSelect.appendChild(option);
     });
   } catch (err) {
@@ -41,15 +42,20 @@ async function getMicrophones() {
   }
 }
 
-// Initialize PeerJS Connection
+// Initialize PeerJS Connection with HTTPS Fixes
 function initPeer() {
   return new Promise((resolve, reject) => {
-    if (peer && currentPeerId) {
+    if (peer && currentPeerId && !peer.destroyed) {
       resolve(currentPeerId);
       return;
     }
 
-    peer = new Peer({
+    // Force secure HTTPS port 443 to avoid net::ERR_CONNECTION_CLOSED on Netlify
+    peer = new Peer(undefined, {
+      host: '0.peerjs.com',
+      port: 443,
+      path: '/',
+      secure: true,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -59,6 +65,7 @@ function initPeer() {
     });
 
     peer.on('open', (id) => {
+      console.log("PeerJS Connected Successfully with ID:", id);
       currentPeerId = id;
       const peerDisplay = document.getElementById('my-peer-id');
       if (peerDisplay) peerDisplay.innerText = "Peer ID: " + id;
@@ -75,13 +82,15 @@ function initPeer() {
     });
 
     peer.on('error', (err) => {
-      console.error("PeerJS Error:", err);
+      console.error("PeerJS Connection Error:", err);
+      const peerDisplay = document.getElementById('my-peer-id');
+      if (peerDisplay) peerDisplay.innerText = "Peer ID: Connection Error";
       reject(err);
     });
   });
 }
 
-// Go Live Function (Host) with Auto-Fallback Logic
+// Go Live Function (Host)
 async function startMyStream() {
   const titleInput = document.getElementById('stream-title-input');
   const streamTitle = titleInput ? titleInput.value.trim() : "";
@@ -103,7 +112,7 @@ async function startMyStream() {
 
   let stream = null;
 
-  // Step 1: Try using the specifically selected microphone
+  // Step 1: Try using selected microphone
   if (selectedMicId) {
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -115,7 +124,7 @@ async function startMyStream() {
     }
   }
 
-  // Step 2: Fallback to default system audio if selected mic failed
+  // Step 2: Fallback to default system audio
   if (!stream) {
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -127,7 +136,7 @@ async function startMyStream() {
     }
   }
 
-  // Step 3: Fallback to video-only if audio devices are blocked/occupied
+  // Step 3: Fallback to video-only
   if (!stream) {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -145,8 +154,10 @@ async function startMyStream() {
     const localVideo = document.getElementById('my-webcam');
     if (localVideo) localVideo.srcObject = stream;
 
+    console.log("Connecting to PeerJS...");
     const peerId = await initPeer();
 
+    console.log("Saving stream to Firestore...");
     await dbInstance.collection('active_streams').doc(activeStreamTitle).set({
       title: streamTitle,
       peerId: peerId,
@@ -159,7 +170,7 @@ async function startMyStream() {
     alert(`Stream "${streamTitle}" is live!`);
   } catch (err) {
     console.error("Error setting up stream on Firebase/PeerJS:", err);
-    alert("Error starting live stream.");
+    alert("Error starting live stream: " + err.message);
   }
 }
 
@@ -183,7 +194,7 @@ async function searchAndWatchStream() {
     const doc = await dbInstance.collection('active_streams').doc(searchTitle).get();
 
     if (!doc.exists) {
-      alert("No active stream found with that title!");
+      alert(`No active stream found matching "${searchTitle}".`);
       return;
     }
 
@@ -221,6 +232,7 @@ async function searchAndWatchStream() {
 
   } catch (err) {
     console.error("Error connecting to stream:", err);
+    alert("Error finding live stream: " + err.message);
   }
 }
 
@@ -307,6 +319,9 @@ async function stopMyStream() {
 
   const vCount = document.getElementById('viewer-count');
   if (vCount) vCount.innerText = "0";
+
+  const peerDisplay = document.getElementById('my-peer-id');
+  if (peerDisplay) peerDisplay.innerText = "Peer ID: Not Connected";
 
   activeStreamTitle = "";
   console.log("Stream stopped.");
@@ -559,3 +574,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 });
+
+// Explicit Global Exports for HTML Handlers
+window.startMyStream = startMyStream;
+window.stopMyStream = stopMyStream;
+window.searchAndWatchStream = searchAndWatchStream;
+window.sendChatMessage = sendChatMessage;
+window.scheduleStream = scheduleStream;
+window.loadScheduledStreams = loadScheduledStreams;
+window.shutdownApp = shutdownApp;
+window.restoreApp = restoreApp;
