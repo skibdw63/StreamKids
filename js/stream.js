@@ -18,6 +18,28 @@ function getDb() {
   return null;
 }
 
+// Helper to generate a valid stream with tracks so WebRTC offer negotiation succeeds when viewing
+function getDummyStream() {
+  const canvas = Object.assign(document.createElement('canvas'), { width: 16, height: 16 });
+  const ctx = canvas.getContext('2d');
+  ctx.fillRect(0, 0, 16, 16);
+  const stream = canvas.captureStream(1);
+
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const dst = audioCtx.createMediaStreamDestination();
+    osc.connect(dst);
+    osc.start();
+    const audioTrack = dst.stream.getAudioTracks()[0];
+    audioTrack.enabled = false;
+    stream.addTrack(audioTrack);
+  } catch (e) {
+    console.warn("Could not attach dummy audio track:", e);
+  }
+  return stream;
+}
+
 // Enumerate connected microphones
 async function getMicrophones() {
   const micSelect = document.getElementById('mic-select');
@@ -42,7 +64,7 @@ async function getMicrophones() {
   }
 }
 
-// Initialize PeerJS Connection with HTTPS Fixes
+// Initialize PeerJS Connection
 function initPeer() {
   return new Promise((resolve, reject) => {
     if (peer && currentPeerId && !peer.destroyed) {
@@ -50,16 +72,17 @@ function initPeer() {
       return;
     }
 
-    // Force secure HTTPS port 443 to avoid net::ERR_CONNECTION_CLOSED on Netlify
-    peer = new Peer(undefined, {
-      host: '0.peerjs.com',
-      port: 443,
-      path: '/',
-      secure: true,
+    if (peer && !peer.destroyed) {
+      try { peer.destroy(); } catch (e) {}
+    }
+
+    // Connects to default official PeerJS cloud server safely over WSS
+    peer = new Peer({
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' }
         ]
       }
     });
@@ -83,9 +106,17 @@ function initPeer() {
 
     peer.on('error', (err) => {
       console.error("PeerJS Connection Error:", err);
+      currentPeerId = null;
       const peerDisplay = document.getElementById('my-peer-id');
       if (peerDisplay) peerDisplay.innerText = "Peer ID: Connection Error";
       reject(err);
+    });
+
+    peer.on('disconnected', () => {
+      console.warn("PeerJS disconnected. Reconnecting...");
+      if (peer && !peer.destroyed) {
+        peer.reconnect();
+      }
     });
   });
 }
@@ -219,7 +250,8 @@ async function searchAndWatchStream() {
     const options = { constraints: { offerToReceiveAudio: true, offerToReceiveVideo: true } };
     if (currentCall) currentCall.close();
     
-    currentCall = peer.call(targetPeerId, localStream || new MediaStream(), options);
+    const callStream = localStream || getDummyStream();
+    currentCall = peer.call(targetPeerId, callStream, options);
 
     currentCall.on('stream', (remoteStream) => {
       const remoteVideo = document.getElementById('remote-webcam');
