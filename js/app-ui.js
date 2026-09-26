@@ -250,117 +250,6 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// Live Stream Handlers with Media Capture
-async function startMyStream() {
-  console.log("Starting stream...");
-  
-  const videoElement = document.getElementById('my-stream-video') 
-                    || document.getElementById('live-preview') 
-                    || document.querySelector('video');
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    
-    if (videoElement) {
-      videoElement.srcObject = stream;
-      videoElement.play();
-    }
-    
-    alert("Live stream started!");
-  } catch (err) {
-    console.error("Error accessing camera/microphone:", err);
-    alert("Could not start stream. Please check camera permissions in your browser.");
-  }
-}
-
-function stopMyStream() {
-  console.log("Stopping stream...");
-  const videoElement = document.getElementById('my-stream-video') 
-                    || document.getElementById('live-preview') 
-                    || document.querySelector('video');
-
-  if (videoElement && videoElement.srcObject) {
-    const tracks = videoElement.srcObject.getTracks();
-    tracks.forEach(track => track.stop());
-    videoElement.srcObject = null;
-    alert("Stream stopped.");
-  }
-}
-
-// Search and Watch Stream Handler
-async function searchAndWatchStream() {
-  const input = document.getElementById('search-stream-input');
-  const streamContainer = document.getElementById('stream-player-container') 
-                       || document.getElementById('watch-container')
-                       || document.getElementById('watch-tab');
-
-  if (!input || !input.value.trim()) {
-    alert("Please enter a stream title or Streamer name to search.");
-    return;
-  }
-
-  const searchQuery = input.value.trim().toLowerCase();
-
-  if (streamContainer) {
-    streamContainer.innerHTML = '<p style="color: #aaa;">Searching for live streams...</p>';
-  }
-
-  try {
-    const snapshot = await firebase.firestore()
-      .collection('streams')
-      .get();
-
-    let foundStream = null;
-
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      const titleMatch = data.title && data.title.toLowerCase().includes(searchQuery);
-      const streamerMatch = (data.uploaderName || data.userName || '').toLowerCase().includes(searchQuery);
-      const idMatch = doc.id === searchQuery;
-
-      if (titleMatch || streamerMatch || idMatch) {
-        foundStream = { id: doc.id, ...data };
-      }
-    });
-
-    if (!foundStream) {
-      if (streamContainer) {
-        streamContainer.innerHTML = `<p style="color: #ff5555; padding: 15px;">No live stream found matching "${escapeHtml(input.value)}".</p>`;
-      } else {
-        alert(`No stream found matching "${input.value}".`);
-      }
-      return;
-    }
-
-    if (streamContainer) {
-      streamContainer.innerHTML = `
-        <div style="padding: 15px; background: #121212; border-radius: 8px; color: #fff; margin-top: 15px;">
-          <h2 style="color: #00ffcc; margin: 0 0 6px 0;">${escapeHtml(foundStream.title || 'Live Stream')}</h2>
-          <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 12px;">
-            Streaming live: <strong style="color: #0088ff;">@${escapeHtml(foundStream.uploaderName || foundStream.userName || 'Creator')}</strong>
-          </p>
-          <video src="${foundStream.streamUrl || foundStream.videoUrl}" controls autoplay style="width: 100%; max-height: 450px; background: #000; border-radius: 6px;"></video>
-          ${foundStream.description ? `<p style="margin-top: 10px; color: #ddd; font-size: 0.95rem;">${escapeHtml(foundStream.description)}</p>` : ''}
-        </div>
-      `;
-    }
-
-  } catch (err) {
-    console.error("Error finding live stream:", err);
-    if (streamContainer) {
-      streamContainer.innerHTML = `<p style="color: #ff5555;">Error loading stream: ${err.message}</p>`;
-    }
-  }
-}
-
-function sendChatMessage() {
-  const input = document.getElementById('chat-input');
-  if (input && input.value.trim() !== "") {
-    console.log("Chat Message Sent:", input.value);
-    input.value = "";
-  }
-}
-
 // File Selection Handler
 function handleFileSelect(event) {
   const file = event.target.files[0];
@@ -373,16 +262,7 @@ function handleFileSelect(event) {
   }
 }
 
-// Video Scheduling Placeholder
-function scheduleStream() {
-  const title = document.getElementById('sched-title').value;
-  const time = document.getElementById('sched-time').value;
-  if (title && time) {
-    alert(`Stream scheduled: ${title} at ${time}`);
-  }
-}
-
-// Explicitly export all functions to window to prevent scope & inline click issues
+// Export UI helper functions to window
 window.showTab = showTab;
 window.loginWithGoogle = loginWithGoogle;
 window.logoutUser = logoutUser;
@@ -392,9 +272,4 @@ window.uploadProfilePicture = uploadProfilePicture;
 window.editChannelDetails = editChannelDetails;
 window.manageVideos = manageVideos;
 window.toggleSubscribe = toggleSubscribe;
-window.startMyStream = startMyStream;
-window.stopMyStream = stopMyStream;
-window.searchAndWatchStream = searchAndWatchStream;
-window.sendChatMessage = sendChatMessage;
 window.handleFileSelect = handleFileSelect;
-window.scheduleStream = scheduleStream;
