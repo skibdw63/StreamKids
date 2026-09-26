@@ -76,8 +76,13 @@ function initPeer() {
       try { peer.destroy(); } catch (e) {}
     }
 
-    // Connects to default official PeerJS cloud server safely over WSS
+    // Force WSS over Port 443 to fix net::ERR_CONNECTION_CLOSED
     peer = new Peer({
+      host: '0.peerjs.com',
+      port: 443,
+      path: '/',
+      secure: true,
+      debug: 1,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -109,6 +114,14 @@ function initPeer() {
       currentPeerId = null;
       const peerDisplay = document.getElementById('my-peer-id');
       if (peerDisplay) peerDisplay.innerText = "Peer ID: Connection Error";
+      
+      if (err.type === 'disconnected' || err.type === 'network' || err.type === 'server-error') {
+        setTimeout(() => {
+          if (peer && peer.disconnected && !peer.destroyed) {
+            peer.reconnect();
+          }
+        }, 3000);
+      }
       reject(err);
     });
 
