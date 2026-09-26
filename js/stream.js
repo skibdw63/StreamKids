@@ -67,7 +67,7 @@ async function getMicrophones() {
 // Initialize PeerJS Connection
 function initPeer() {
   return new Promise((resolve, reject) => {
-    if (peer && currentPeerId && !peer.destroyed) {
+    if (peer && currentPeerId && !peer.destroyed && !peer.disconnected) {
       resolve(currentPeerId);
       return;
     }
@@ -76,7 +76,7 @@ function initPeer() {
       try { peer.destroy(); } catch (e) {}
     }
 
-    // Force WSS over Port 443 to fix net::ERR_CONNECTION_CLOSED
+    // Force WSS over Port 443
     peer = new Peer({
       host: '0.peerjs.com',
       port: 443,
@@ -101,28 +101,41 @@ function initPeer() {
     });
 
     peer.on('call', (call) => {
-      currentCall = call;
-      call.answer(localStream);
+      console.log("Incoming call received...");
+      call.answer(localStream || getDummyStream());
+
       call.on('stream', (remoteStream) => {
         const remoteVideo = document.getElementById('remote-webcam');
         if (remoteVideo) remoteVideo.srcObject = remoteStream;
       });
+
+      call.on('error', (err) => {
+        console.warn("Handled call error:", err);
+      });
     });
 
     peer.on('error', (err) => {
-      console.error("PeerJS Connection Error:", err);
-      currentPeerId = null;
-      const peerDisplay = document.getElementById('my-peer-id');
-      if (peerDisplay) peerDisplay.innerText = "Peer ID: Connection Error";
-      
-      if (err.type === 'disconnected' || err.type === 'network' || err.type === 'server-error') {
+      console.warn("PeerJS Event Error:", err);
+
+      // Ignore non-fatal SDP negotiation state warnings
+      if (err && err.toString().includes('setRemoteDescription')) {
+        console.warn("Suppressed non-fatal WebRTC state warning.");
+        return;
+      }
+
+      // Only mark UI as error if it's a critical socket/network disconnection
+      if (err.type === 'disconnected' || err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') {
+        currentPeerId = null;
+        const peerDisplay = document.getElementById('my-peer-id');
+        if (peerDisplay) peerDisplay.innerText = "Peer ID: Connection Error";
+        
         setTimeout(() => {
           if (peer && peer.disconnected && !peer.destroyed) {
             peer.reconnect();
           }
         }, 3000);
+        reject(err);
       }
-      reject(err);
     });
 
     peer.on('disconnected', () => {
@@ -260,11 +273,10 @@ async function searchAndWatchStream() {
 
     await initPeer();
 
-    const options = { constraints: { offerToReceiveAudio: true, offerToReceiveVideo: true } };
     if (currentCall) currentCall.close();
     
     const callStream = localStream || getDummyStream();
-    currentCall = peer.call(targetPeerId, callStream, options);
+    currentCall = peer.call(targetPeerId, callStream);
 
     currentCall.on('stream', (remoteStream) => {
       const remoteVideo = document.getElementById('remote-webcam');
@@ -273,6 +285,10 @@ async function searchAndWatchStream() {
         remoteVideo.muted = false;
         remoteVideo.play().catch(console.error);
       }
+    });
+
+    currentCall.on('error', (err) => {
+      console.warn("Viewer call error:", err);
     });
 
   } catch (err) {
