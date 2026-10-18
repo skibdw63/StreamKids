@@ -22,10 +22,10 @@ function logoutUser() {
   firebase.auth().signOut();
 }
 
-// Automated YouTube Backend Video Upload
+// Automated YouTube Backend Video Upload with Stream Tracking
 async function uploadKidVideo(file, title, description) {
   const uploadStatus = document.getElementById('upload-status');
-  if (uploadStatus) uploadStatus.innerText = 'Uploading video... Please wait!';
+  if (uploadStatus) uploadStatus.innerText = 'Preparing video stream...';
 
   const formData = new FormData();
   formData.append('video', file);
@@ -33,29 +33,54 @@ async function uploadKidVideo(file, title, description) {
   formData.append('description', description || 'Uploaded on StreamKids');
 
   try {
-    // 1. Send video file to your live Render backend
-    const response = await fetch('https://streamkids-upload-service.onrender.com/upload', {
-      method: 'POST',
-      body: formData
+    const xhr = new XMLHttpRequest();
+
+    // Track real-time progress for large files (e.g. 20+ minute videos)
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && uploadStatus) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        uploadStatus.innerText = `Uploading to server: ${percent}% complete...`;
+      }
+    };
+
+    // Send payload to Render server asynchronously
+    const response = await new Promise((resolve, reject) => {
+      xhr.open('POST', 'https://streamkids-upload-service.onrender.com/upload', true);
+      
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch (e) {
+            reject(new Error("Invalid JSON response from server"));
+          }
+        } else {
+          reject(new Error(`Server Error (${xhr.status}): ${xhr.responseText}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error or server connection closed.'));
+      xhr.send(formData);
     });
 
-    const data = await response.json();
-    if (!data.success) throw new Error(data.error);
+    if (!response.success) throw new Error(response.error);
+
+    if (uploadStatus) uploadStatus.innerText = 'Processing on YouTube... Almost done!';
 
     const currentUser = firebase.auth().currentUser;
 
-    // 2. Save video metadata + returned YouTube Video ID into Firestore
+    // Save video metadata + returned YouTube Video ID into Firestore
     await firebase.firestore().collection('videos').add({
       title: title || 'StreamKids Video',
       description: description || 'Uploaded on StreamKids',
-      youtubeVideoId: data.videoId,
+      youtubeVideoId: response.videoId,
       visibility: 'public',
       uploaderUid: currentUser ? currentUser.uid : 'guest',
       uploaderName: currentUser ? currentUser.displayName : 'Guest Creator',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    if (uploadStatus) uploadStatus.innerText = 'Upload successful!';
+    if (uploadStatus) uploadStatus.innerText = 'Upload complete!';
     alert('Your video is live on StreamKids!');
 
     // Reset upload form & refresh feed
