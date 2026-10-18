@@ -53,42 +53,39 @@ async function uploadKidVideo(file, title, description) {
       }
     };
 
-    const youtubeResult = await new Promise((resolve, reject) => {
+    await new Promise((resolve) => {
       xhr.open('PUT', urlData.uploadUrl, true);
       xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const res = JSON.parse(xhr.responseText);
-            resolve(res);
-          } catch (e) {
-            resolve({ success: true });
-          }
-        } else {
-          reject(new Error(`YouTube Direct Upload Error (${xhr.status}): ${xhr.responseText}`));
-        }
-      };
-
-      xhr.onerror = () => {
-        // Fallback for CORS block on final completion chunk
-        resolve({ success: true });
-      };
-
+      xhr.onload = () => resolve();
+      xhr.onerror = () => resolve();
       xhr.send(file);
     });
 
-    let videoId = youtubeResult ? youtubeResult.id : null;
+    if (uploadStatus) uploadStatus.innerText = 'Verifying YouTube Video ID...';
+
+    // 3. Verify upload session server-side through Render
+    const verifyResponse = await fetch('https://streamkids-upload-service.onrender.com/verify-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uploadUrl: urlData.uploadUrl })
+    });
+
+    const verifyData = await verifyResponse.json();
+    const realVideoId = verifyData.videoId;
+
+    if (!realVideoId) {
+      throw new Error("Failed to retrieve valid YouTube Video ID.");
+    }
 
     if (uploadStatus) uploadStatus.innerText = 'Saving to StreamKids database...';
 
     const currentUser = firebase.auth().currentUser;
 
-    // Save Video metadata to Firestore
+    // 4. Save Video ID to Firestore
     await firebase.firestore().collection('videos').add({
       title: title || 'StreamKids Video',
       description: description || 'Uploaded on StreamKids',
-      youtubeVideoId: videoId || 'PROCESSING',
+      youtubeVideoId: realVideoId,
       visibility: 'public',
       uploaderUid: currentUser ? currentUser.uid : 'guest',
       uploaderName: currentUser ? currentUser.displayName : 'Guest Creator',
