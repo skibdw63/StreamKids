@@ -22,7 +22,55 @@ function logoutUser() {
   firebase.auth().signOut();
 }
 
-// Loads and renders videos in the For You Page (FYP) feed
+// Automated YouTube Backend Video Upload
+async function uploadKidVideo(file, title, description) {
+  const uploadStatus = document.getElementById('upload-status');
+  if (uploadStatus) uploadStatus.innerText = 'Uploading video... Please wait!';
+
+  const formData = new FormData();
+  formData.append('video', file);
+  formData.append('title', title || 'StreamKids Video');
+  formData.append('description', description || 'Uploaded on StreamKids');
+
+  try {
+    // 1. Send video file to your live Render backend
+    const response = await fetch('https://streamkids-upload-service.onrender.com/upload', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+    if (!data.success) throw new Error(data.error);
+
+    const currentUser = firebase.auth().currentUser;
+
+    // 2. Save video metadata + returned YouTube Video ID into Firestore
+    await firebase.firestore().collection('videos').add({
+      title: title || 'StreamKids Video',
+      description: description || 'Uploaded on StreamKids',
+      youtubeVideoId: data.videoId,
+      visibility: 'public',
+      uploaderUid: currentUser ? currentUser.uid : 'guest',
+      uploaderName: currentUser ? currentUser.displayName : 'Guest Creator',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    if (uploadStatus) uploadStatus.innerText = 'Upload successful!';
+    alert('Your video is live on StreamKids!');
+
+    // Reset upload form & refresh feed
+    const form = document.getElementById('upload-form');
+    if (form) form.reset();
+    showTab('fyp-tab');
+
+  } catch (err) {
+    console.error('Upload Error:', err);
+    if (uploadStatus) uploadStatus.innerText = 'Upload failed: ' + err.message;
+    alert('Upload failed: ' + err.message);
+  }
+}
+
+// Loads and renders videos in the For You Page (FYP) feed using YouTube Embeds
 async function loadFYP() {
   const fypContainer = document.getElementById('fyp-container');
   if (!fypContainer) return;
@@ -46,7 +94,6 @@ async function loadFYP() {
     snapshot.forEach(doc => {
       const data = doc.data();
 
-      // Uses uploaderName from the Firestore document
       const authorName = data.uploaderName || data.userName || 'Guest User';
       const uploaderUid = data.uploaderUid || data.userId || data.uid || data.authorId || '';
 
@@ -59,7 +106,19 @@ async function loadFYP() {
         <p style="color: #aaaaaa; font-size: 0.9rem; margin-bottom: 10px;">
           Posted by <span onclick="event.stopPropagation(); openChannelProfile('${uploaderUid}')" style="color: #0088ff; cursor: pointer; font-weight: bold;">@${escapeHtml(authorName)}</span>
         </p>
-        <video src="${data.videoUrl}" controls style="width: 100%; max-height: 400px; background: #000; border-radius: 6px;"></video>
+        
+        <!-- Embedded YouTube Player -->
+        <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; background: #000;">
+          <iframe 
+            src="https://www.youtube-nocookie.com/embed/${data.youtubeVideoId}?autoplay=0&rel=0&modestbranding=1" 
+            title="${escapeHtml(data.title || 'StreamKids Video')}"
+            frameborder="0" 
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+            allowfullscreen
+            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;">
+          </iframe>
+        </div>
+
         ${data.description ? `<p style="margin-top: 8px; color: #dddddd;">${escapeHtml(data.description)}</p>` : ''}
       `;
 
@@ -76,7 +135,6 @@ async function openChannelProfile(targetUid) {
   const profileContainer = document.getElementById('profile-container');
   if (!profileContainer) return;
 
-  // Handle case where targetUid is missing or 'undefined' string
   if (!targetUid || targetUid === 'undefined') {
     profileContainer.innerHTML = `
       <div style="padding: 20px; color: #ff5555; text-align: center;">
@@ -90,19 +148,16 @@ async function openChannelProfile(targetUid) {
   const currentUser = firebase.auth().currentUser;
   const isOwner = currentUser && currentUser.uid === targetUid;
 
-  // Show profile section tab
   showTab('profile-tab');
   profileContainer.innerHTML = '<p style="color: #aaa;">Loading channel...</p>';
 
   try {
-    // 1. Fetch channel owner profile data from Firestore
     const userDoc = await firebase.firestore().collection('users').doc(targetUid).get();
     const userData = userDoc.exists ? userDoc.data() : {};
 
     const displayName = userData.displayName || 'StreamKids Creator';
     const handle = userData.handle || `@user_${targetUid.substring(0, 5)}`;
     
-    // Ensure avatarUrl falls back safely to default placeholder image
     let avatarUrl = userData.avatarUrl;
     if (!avatarUrl || avatarUrl.includes('apppicture.png')) {
       avatarUrl = 'https://via.placeholder.com/150';
@@ -110,23 +165,15 @@ async function openChannelProfile(targetUid) {
 
     const bio = userData.bio || 'Welcome to my official channel!';
 
-    // 2. Fetch user's uploaded videos with field fallbacks
     let videosSnapshot = await firebase.firestore()
       .collection('videos')
       .where('uploaderUid', '==', targetUid)
       .get();
 
-    // Fallback search if 'uploaderUid' field name differs in older records
     if (videosSnapshot.empty) {
       videosSnapshot = await firebase.firestore()
         .collection('videos')
         .where('userId', '==', targetUid)
-        .get();
-    }
-    if (videosSnapshot.empty) {
-      videosSnapshot = await firebase.firestore()
-        .collection('videos')
-        .where('uid', '==', targetUid)
         .get();
     }
 
@@ -140,19 +187,26 @@ async function openChannelProfile(targetUid) {
       videosSnapshot.forEach(doc => {
         const v = doc.data();
         videoCardsHtml += `
-          <div style="width: 220px; margin: 10px; display: inline-block; text-align: left; background: #181818; padding: 10px; border-radius: 8px;">
-            <video src="${v.videoUrl}" controls style="width: 100%; height: 130px; border-radius: 6px; object-fit: cover; background: #000;"></video>
+          <div style="width: 280px; margin: 10px; display: inline-block; text-align: left; background: #181818; padding: 10px; border-radius: 8px; vertical-align: top;">
+            <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 6px; background: #000;">
+              <iframe 
+                src="https://www.youtube-nocookie.com/embed/${v.youtubeVideoId}?autoplay=0&rel=0&modestbranding=1" 
+                title="${escapeHtml(v.title || 'Video')}"
+                frameborder="0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowfullscreen
+                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;">
+              </iframe>
+            </div>
             <p style="font-weight: bold; margin: 8px 0 2px; color: #fff; font-size: 0.95rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(v.title || 'Untitled')}</p>
             ${v.description ? `<p style="color: #aaa; font-size: 0.8rem; margin: 0; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(v.description)}</p>` : ''}
           </div>`;
       });
     }
 
-    // 3. Render Profile
     profileContainer.innerHTML = `
       <div style="padding: 20px; color: #fff;">
         <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
-          <!-- Profile Picture with fallback -->
           <div style="position: relative;">
             <img id="profile-avatar-img" 
                  src="${avatarUrl}" 
@@ -169,7 +223,6 @@ async function openChannelProfile(targetUid) {
             <p style="margin: 4px 0; color: #aaa;">${escapeHtml(handle)}</p>
             <p style="margin: 4px 0; color: #ddd; font-size: 0.9rem;">${escapeHtml(bio)}</p>
 
-            <!-- Action Buttons -->
             <div style="margin-top: 12px; display: flex; gap: 10px;">
               ${isOwner ? `
                 <button onclick="editChannelDetails()" style="padding: 8px 16px; background: #333; color: #fff; border: 1px solid #555; border-radius: 20px; cursor: pointer;">Customize channel</button>
@@ -183,7 +236,6 @@ async function openChannelProfile(targetUid) {
 
         <hr style="border-color: #333; margin: 20px 0;" />
 
-        <!-- Videos Section -->
         <div>
           <h3 style="margin-bottom: 15px;">Uploaded Videos</h3>
           <div style="display: flex; flex-wrap: wrap; gap: 10px;">${videoCardsHtml}</div>
@@ -203,7 +255,6 @@ async function uploadProfilePicture(event, uid) {
   if (!file) return;
 
   try {
-    // 1. Upload file to Supabase Storage
     const fileName = `avatars/${uid}_${Date.now()}`;
     const { data, error } = await supabase.storage.from('streamkids-videos').upload(fileName, file);
 
@@ -212,12 +263,10 @@ async function uploadProfilePicture(event, uid) {
     const { data: publicUrlData } = supabase.storage.from('streamkids-videos').getPublicUrl(fileName);
     const newAvatarUrl = publicUrlData.publicUrl;
 
-    // 2. Save image URL to Firestore user document
     await firebase.firestore().collection('users').doc(uid).set({
       avatarUrl: newAvatarUrl
     }, { merge: true });
 
-    // 3. Update DOM avatar image element directly
     const imgElem = document.getElementById('profile-avatar-img');
     if (imgElem) imgElem.src = newAvatarUrl;
 
@@ -266,6 +315,7 @@ function handleFileSelect(event) {
 window.showTab = showTab;
 window.loginWithGoogle = loginWithGoogle;
 window.logoutUser = logoutUser;
+window.uploadKidVideo = uploadKidVideo;
 window.loadFYP = loadFYP;
 window.openChannelProfile = openChannelProfile;
 window.uploadProfilePicture = uploadProfilePicture;
