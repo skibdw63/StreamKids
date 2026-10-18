@@ -22,68 +22,78 @@ function logoutUser() {
   firebase.auth().signOut();
 }
 
-// Automated YouTube Backend Video Upload with Stream Tracking
+// Automated Direct YouTube Resumable Upload
 async function uploadKidVideo(file, title, description) {
   const uploadStatus = document.getElementById('upload-status');
-  if (uploadStatus) uploadStatus.innerText = 'Preparing video stream...';
-
-  const formData = new FormData();
-  formData.append('video', file);
-  formData.append('title', title || 'StreamKids Video');
-  formData.append('description', description || 'Uploaded on StreamKids');
+  if (uploadStatus) uploadStatus.innerText = 'Initializing upload session...';
 
   try {
+    // 1. Get Direct YouTube Upload URL from Render (Fast API call)
+    const urlResponse = await fetch('https://streamkids-upload-service.onrender.com/get-upload-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: title || 'StreamKids Video',
+        description: description || 'Uploaded on StreamKids'
+      })
+    });
+
+    const urlData = await urlResponse.json();
+    if (!urlData.success) throw new Error(urlData.error);
+
+    if (uploadStatus) uploadStatus.innerText = 'Uploading directly to YouTube: 0%...';
+
+    // 2. Stream video file directly to YouTube's server with progress tracker
     const xhr = new XMLHttpRequest();
 
-    // Track real-time progress for large files (e.g. 20+ minute videos)
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && uploadStatus) {
         const percent = Math.round((event.loaded / event.total) * 100);
-        uploadStatus.innerText = `Uploading to server: ${percent}% complete...`;
+        uploadStatus.innerText = `Uploading directly to YouTube: ${percent}% complete...`;
       }
     };
 
-    // Send payload to Render server asynchronously
-    const response = await new Promise((resolve, reject) => {
-      xhr.open('POST', 'https://streamkids-upload-service.onrender.com/upload', true);
-      
+    const youtubeResult = await new Promise((resolve, reject) => {
+      xhr.open('PUT', urlData.uploadUrl, true);
+      xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             resolve(JSON.parse(xhr.responseText));
           } catch (e) {
-            reject(new Error("Invalid JSON response from server"));
+            reject(new Error("Invalid JSON returned by YouTube."));
           }
         } else {
-          reject(new Error(`Server Error (${xhr.status}): ${xhr.responseText}`));
+          reject(new Error(`YouTube Direct Upload Error (${xhr.status}): ${xhr.responseText}`));
         }
       };
 
-      xhr.onerror = () => reject(new Error('Network error or server connection closed.'));
-      xhr.send(formData);
+      xhr.onerror = () => reject(new Error('Network error uploading directly to YouTube.'));
+      xhr.send(file);
     });
 
-    if (!response.success) throw new Error(response.error);
+    const videoId = youtubeResult.id;
+    if (!videoId) throw new Error("Did not receive YouTube Video ID.");
 
-    if (uploadStatus) uploadStatus.innerText = 'Processing on YouTube... Almost done!';
+    if (uploadStatus) uploadStatus.innerText = 'Saving to StreamKids database...';
 
     const currentUser = firebase.auth().currentUser;
 
-    // Save video metadata + returned YouTube Video ID into Firestore
+    // 3. Save Video ID to Firestore
     await firebase.firestore().collection('videos').add({
       title: title || 'StreamKids Video',
       description: description || 'Uploaded on StreamKids',
-      youtubeVideoId: response.videoId,
+      youtubeVideoId: videoId,
       visibility: 'public',
       uploaderUid: currentUser ? currentUser.uid : 'guest',
       uploaderName: currentUser ? currentUser.displayName : 'Guest Creator',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    if (uploadStatus) uploadStatus.innerText = 'Upload complete!';
+    if (uploadStatus) uploadStatus.innerText = 'Upload successful!';
     alert('Your video is live on StreamKids!');
 
-    // Reset upload form & refresh feed
     const form = document.getElementById('upload-form');
     if (form) form.reset();
     showTab('fyp-tab');
