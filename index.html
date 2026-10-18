@@ -375,19 +375,11 @@
     let currentSelectedUid = null;
     let currentSelectedUserVerified = false;
 
-    // Supabase Initialization
-    const SUPABASE_URL = 'https://dyanandcqxywovnftghp.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_cKP7iQeVTcG3MAeTNg4N5g_j18Y_5mN';
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    // Upload Video using Supabase Storage & Firebase Firestore
-    async function uploadVideo() {
+    // Triggered on Form Submit
+    function handleKidUploadSubmit() {
       const fileInput = document.getElementById('video-file-input');
       const titleInput = document.getElementById('video-title-input').value;
       const descInput = document.getElementById('video-desc-input').value;
-      const visibilityInput = document.querySelector('input[name="video-visibility"]:checked').value;
-      const statusEl = document.getElementById('upload-status');
-      const user = firebase.auth().currentUser;
 
       if (!fileInput.files.length) {
         alert("Please select a video file first!");
@@ -399,48 +391,8 @@
         return;
       }
 
-      const file = fileInput.files[0];
-      const filePath = `public/${Date.now()}_${file.name}`;
-      statusEl.innerText = "Uploading video to Supabase Storage...";
-
-      try {
-        const { data: uploadData, error: uploadError } = await supabaseClient.storage
-          .from('streamkids-videos')
-          .upload(filePath, file);
-
-        if (uploadError) {
-          throw new Error("Supabase Upload Error: " + uploadError.message);
-        }
-
-        const { data: publicUrlData } = supabaseClient.storage
-          .from('streamkids-videos')
-          .getPublicUrl(filePath);
-
-        const videoPublicUrl = publicUrlData.publicUrl;
-        statusEl.innerText = "Saving video details to Firebase...";
-
-        await firebase.firestore().collection('videos').add({
-          title: titleInput,
-          description: descInput,
-          visibility: visibilityInput,
-          videoUrl: videoPublicUrl,
-          uploaderUid: user ? user.uid : 'anonymous',
-          uploaderName: user ? (user.displayName || user.email) : 'Anonymous',
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        statusEl.innerText = "Video published successfully!";
-        statusEl.style.color = "#00ffcc";
-
-        document.getElementById('video-title-input').value = '';
-        document.getElementById('video-desc-input').value = '';
-        document.getElementById('upload-form').style.display = 'none';
-        fileInput.value = '';
-      } catch (err) {
-        console.error("Upload error:", err);
-        statusEl.innerText = err.message;
-        statusEl.style.color = "#ff5555";
-      }
+      // Calls the Render + YouTube Backend Upload function in app-ui.js
+      uploadKidVideo(fileInput.files[0], titleInput, descInput);
     }
 
     // Admin Controls
@@ -750,7 +702,7 @@
           <label><input type="radio" name="video-visibility" value="private"> Private</label>
         </div>
 
-        <button id="upload-btn" onclick="uploadVideo()" class="btn btn-green">Publish Video</button>
+        <button id="upload-btn" onclick="handleKidUploadSubmit()" class="btn btn-green">Publish Video</button>
         <p id="upload-status" style="color: #aaa; margin-top: 10px;"></p>
       </div>
     </div>
