@@ -38,6 +38,10 @@ async function uploadKidVideo(file, title, description) {
       })
     });
 
+    if (!urlResponse.ok) {
+      throw new Error(`Failed to get upload URL (HTTP ${urlResponse.status})`);
+    }
+
     const urlData = await urlResponse.json();
     if (!urlData.success) throw new Error(urlData.error);
 
@@ -53,35 +57,58 @@ async function uploadKidVideo(file, title, description) {
       }
     };
 
+    let responseText = null;
+
     await new Promise((resolve) => {
       xhr.open('PUT', urlData.uploadUrl, true);
       xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
-      xhr.onload = () => resolve();
+      xhr.onload = () => {
+        responseText = xhr.responseText;
+        resolve();
+      };
       xhr.onerror = () => resolve();
       xhr.send(file);
     });
 
     if (uploadStatus) uploadStatus.innerText = 'Verifying YouTube Video ID...';
 
-    // 3. Verify upload session server-side through Render
-    const verifyResponse = await fetch('https://streamkids-upload-service.onrender.com/verify-upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uploadUrl: urlData.uploadUrl })
-    });
+    let realVideoId = null;
 
-    const verifyData = await verifyResponse.json();
-    const realVideoId = verifyData.videoId;
+    // Try parsing raw response if browser captured it
+    if (responseText) {
+      try {
+        const parsed = JSON.parse(responseText);
+        if (parsed.id) realVideoId = parsed.id;
+      } catch (e) {}
+    }
+
+    // Try server verification if endpoint exists
+    if (!realVideoId) {
+      try {
+        const verifyResponse = await fetch('https://streamkids-upload-service.onrender.com/verify-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uploadUrl: urlData.uploadUrl })
+        });
+
+        if (verifyResponse.ok) {
+          const verifyData = await verifyResponse.json();
+          if (verifyData.videoId) realVideoId = verifyData.videoId;
+        }
+      } catch (e) {
+        console.warn("Server verification skipped:", e);
+      }
+    }
 
     if (!realVideoId) {
-      throw new Error("Failed to retrieve valid YouTube Video ID.");
+      throw new Error("Could not extract valid 11-character YouTube Video ID.");
     }
 
     if (uploadStatus) uploadStatus.innerText = 'Saving to StreamKids database...';
 
     const currentUser = firebase.auth().currentUser;
 
-    // 4. Save Video ID to Firestore
+    // 3. Save Video ID to Firestore
     await firebase.firestore().collection('videos').add({
       title: title || 'StreamKids Video',
       description: description || 'Uploaded on StreamKids',
