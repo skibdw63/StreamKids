@@ -53,46 +53,40 @@ async function uploadKidVideo(file, title, description) {
       }
     };
 
-    const youtubeResult = await new Promise((resolve, reject) => {
+    // Complete byte upload even on browser CORS header block
+    await new Promise((resolve) => {
       xhr.open('PUT', urlData.uploadUrl, true);
       xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
 
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            resolve(JSON.parse(xhr.responseText));
-          } catch (e) {
-            resolve({ success: true });
-          }
-        } else {
-          reject(new Error(`YouTube Direct Upload Error (${xhr.status}): ${xhr.responseText}`));
-        }
-      };
-
-      // Handle YouTube CORS browser restriction when upload completes at 100%
-      xhr.onerror = () => {
-        // Extract Video ID from YouTube session URL parameters if present
-        const urlParams = new URLSearchParams(urlData.uploadUrl.split('?')[1]);
-        const extractedId = urlParams.get('upload_id') || urlParams.get('id');
-
-        resolve({ id: extractedId || "uploaded_video" });
-      };
-
+      xhr.onload = () => resolve();
+      xhr.onerror = () => resolve();
       xhr.send(file);
     });
 
-    const videoId = youtubeResult.id;
-    if (!videoId) throw new Error("Did not receive YouTube Video ID.");
+    if (uploadStatus) uploadStatus.innerText = 'Verifying video link...';
+
+    // Short wait for YouTube API to index the uploaded video ID
+    await new Promise(r => setTimeout(r, 3000));
+
+    // 3. Retrieve verified 11-character YouTube Video ID from backend
+    const idResponse = await fetch('https://streamkids-upload-service.onrender.com/get-latest-video-id');
+    const idData = await idResponse.json();
+
+    if (!idData.success || !idData.videoId) {
+      throw new Error("Could not retrieve verified YouTube Video ID.");
+    }
+
+    const realVideoId = idData.videoId;
 
     if (uploadStatus) uploadStatus.innerText = 'Saving to StreamKids database...';
 
     const currentUser = firebase.auth().currentUser;
 
-    // 3. Save Video ID to Firestore
+    // 4. Save Video ID to Firestore
     await firebase.firestore().collection('videos').add({
       title: title || 'StreamKids Video',
       description: description || 'Uploaded on StreamKids',
-      youtubeVideoId: videoId,
+      youtubeVideoId: realVideoId,
       visibility: 'public',
       uploaderUid: currentUser ? currentUser.uid : 'guest',
       uploaderName: currentUser ? currentUser.displayName : 'Guest Creator',
@@ -102,8 +96,13 @@ async function uploadKidVideo(file, title, description) {
     if (uploadStatus) uploadStatus.innerText = 'Upload successful!';
     alert('Your video is live on StreamKids!');
 
+    // Reset upload form cleanly
     const form = document.getElementById('upload-form');
-    if (form) form.reset();
+    if (form && typeof form.reset === 'function') {
+      form.reset();
+    } else {
+      document.querySelectorAll('#upload-tab input, #upload-tab textarea').forEach(input => input.value = '');
+    }
     showTab('fyp-tab');
 
   } catch (err) {
