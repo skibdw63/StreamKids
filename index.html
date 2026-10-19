@@ -450,7 +450,7 @@
     }
 
     // Channel Profile & Verification Modal System
-    function openChannelProfile(uid) {
+    async function openChannelProfile(uid) {
       if (!uid) return;
       currentSelectedUid = uid;
 
@@ -459,21 +459,51 @@
       const emailEl = document.getElementById('profile-modal-email');
       const avatarEl = document.getElementById('profile-modal-avatar');
       const badgeEl = document.getElementById('profile-modal-badge');
+      const subsEl = document.getElementById('profile-modal-subs');
+      const subBtnContainer = document.getElementById('modal-subscribe-container');
+      const subBtn = document.getElementById('modal-sub-btn');
       const adminControls = document.getElementById('admin-verify-controls');
       const toggleBtn = document.getElementById('toggle-verify-btn');
 
-      firebase.firestore().collection('users').doc(uid).get().then(doc => {
+      const currentUser = firebase.auth().currentUser;
+      const isAdmin = currentUser && currentUser.email && currentUser.email.toLowerCase() === ADMIN_EMAIL;
+      const isSelf = currentUser && currentUser.uid === uid;
+
+      try {
+        const doc = await firebase.firestore().collection('users').doc(uid).get();
         if (doc.exists) {
           const data = doc.data();
           nameEl.innerText = data.displayName || 'User';
           emailEl.innerText = data.email || '';
           avatarEl.src = data.photoURL || 'https://via.placeholder.com/80';
           
+          const subCount = data.subscribersCount || 0;
+          if (subsEl) subsEl.innerText = subCount.toLocaleString();
+
           currentSelectedUserVerified = !!data.isVerified;
           badgeEl.style.display = currentSelectedUserVerified ? 'inline' : 'none';
 
-          const currentUser = firebase.auth().currentUser;
-          const isAdmin = currentUser && currentUser.email && currentUser.email.toLowerCase() === ADMIN_EMAIL;
+          // Hide subscribe button if viewing your own profile
+          if (isSelf) {
+            if (subBtnContainer) subBtnContainer.style.display = 'none';
+          } else {
+            if (subBtnContainer) subBtnContainer.style.display = 'block';
+
+            // Check if current user is subscribed
+            let isSubscribed = false;
+            if (currentUser) {
+              const myDoc = await firebase.firestore().collection('users').doc(currentUser.uid).get();
+              if (myDoc.exists) {
+                const mySubs = myDoc.data().subscriptions || [];
+                isSubscribed = mySubs.includes(uid);
+              }
+            }
+
+            if (subBtn) {
+              subBtn.innerText = isSubscribed ? 'Subscribed' : 'Subscribe';
+              subBtn.className = isSubscribed ? 'btn btn-gray' : 'btn btn-red';
+            }
+          }
 
           if (isAdmin) {
             adminControls.style.display = 'block';
@@ -485,7 +515,9 @@
 
           modal.style.display = 'flex';
         }
-      }).catch(err => console.error("Error fetching user profile:", err));
+      } catch (err) {
+        console.error("Error fetching user profile:", err);
+      }
     }
 
     function closeProfileModal() {
@@ -504,7 +536,6 @@
 
       const newStatus = !currentSelectedUserVerified;
 
-      // Updates Firestore globally so all users see the badge update instantly
       firebase.firestore().collection('users').doc(currentSelectedUid).update({
         isVerified: newStatus
       }).then(() => {
@@ -588,7 +619,9 @@
                 displayName: user.displayName || 'Anonymous',
                 email: user.email,
                 photoURL: user.photoURL || '',
-                isVerified: isAdmin
+                isVerified: isAdmin,
+                subscribersCount: 0,
+                subscriptions: []
               });
             }
           });
@@ -602,7 +635,7 @@
           if (userInfo) userInfo.style.display = 'none';
           if (shutdownBtn) shutdownBtn.style.display = 'none';
           if (crashBtn) shutdownBtn.style.display = 'none';
-          if (restoreBtn) shutdownBtn.style.display = 'none';
+          if (restoreBtn) restoreBtn.style.display = 'none';
           if (globalAdminPanel) globalAdminPanel.style.display = 'none';
         }
       });
@@ -759,10 +792,26 @@
       </h2>
       <p id="profile-modal-email" style="color: #888; font-size: 0.85rem; margin-top: 4px;"></p>
 
+      <!-- 👥 Subscriber Count Display -->
+      <p style="color: #00ffcc; font-size: 1rem; font-weight: bold; margin: 10px 0;">
+        👥 <span id="profile-modal-subs">0</span> Subscribers
+      </p>
+
+      <!-- 🔴 Subscribe Button -->
+      <div id="modal-subscribe-container" style="margin-top: 10px;">
+        <button id="modal-sub-btn" onclick="toggleSubscribe(currentSelectedUid)" class="btn btn-red" style="width: 100%; border-radius: 20px; padding: 10px; font-size: 1rem;">
+          Subscribe
+        </button>
+      </div>
+
+      <!-- 👑 Admin Verification & Override Controls -->
       <div id="admin-verify-controls" class="admin-control-box" style="display: none;">
-        <p style="font-size: 0.8rem; color: #ffd700; margin-bottom: 8px; font-weight: bold;">Global Admin Verification Control</p>
-        <button id="toggle-verify-btn" onclick="toggleUserVerification()" class="btn btn-blue" style="font-size: 0.8rem; padding: 6px 12px; width: 100%;">
+        <p style="font-size: 0.8rem; color: #ffd700; margin-bottom: 8px; font-weight: bold;">👑 Global Admin Controls</p>
+        <button id="toggle-verify-btn" onclick="toggleUserVerification()" class="btn btn-blue" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; margin-bottom: 6px;">
           Grant Verified Badge
+        </button>
+        <button onclick="adminOverrideStats(currentSelectedUid, 'users', 'subscribersCount', prompt('Set New Global Subscriber Count:'))" class="btn btn-gold" style="font-size: 0.8rem; padding: 6px 12px; width: 100%;">
+          👑 Override Subscribers
         </button>
       </div>
     </div>
