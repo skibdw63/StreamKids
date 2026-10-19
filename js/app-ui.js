@@ -332,7 +332,7 @@ async function openChannelProfile(targetUid) {
 
     const displayName = userData.displayName || 'StreamKids Creator';
     const handle = userData.handle || `@user_${targetUid.substring(0, 5)}`;
-    const subscribersCount = userData.subscribersCount || 1;
+    const subscribersCount = userData.subscribersCount || 0;
     
     let avatarUrl = userData.avatarUrl;
     if (!avatarUrl || avatarUrl.includes('apppicture.png')) {
@@ -468,8 +468,78 @@ function manageVideos() {
   alert("Manage Videos panel coming soon!");
 }
 
-function toggleSubscribe(targetUid) {
-  alert("Subscribed to channel!");
+// ==========================================
+// 👥 REAL-TIME SUBSCRIPTION TRANSACTION
+// ==========================================
+async function toggleSubscribe(targetUid) {
+  const currentUser = firebase.auth().currentUser;
+  if (!currentUser) {
+    alert("Please log in with Google to subscribe!");
+    return;
+  }
+
+  if (currentUser.uid === targetUid) {
+    alert("You cannot subscribe to your own channel!");
+    return;
+  }
+
+  const targetUserRef = firebase.firestore().collection('users').doc(targetUid);
+  const currentUserRef = firebase.firestore().collection('users').doc(currentUser.uid);
+
+  try {
+    await firebase.firestore().runTransaction(async (transaction) => {
+      const targetDoc = await transaction.get(targetUserRef);
+      const currentDoc = await transaction.get(currentUserRef);
+
+      if (!targetDoc.exists) throw "Channel does not exist!";
+
+      const targetData = targetDoc.data();
+      const currentData = currentDoc.exists ? currentDoc.data() : {};
+
+      const subscriptions = currentData.subscriptions || [];
+      const subIndex = subscriptions.indexOf(targetUid);
+
+      let currentSubCount = targetData.subscribersCount || 0;
+      let isSubbed = false;
+
+      if (subIndex > -1) {
+        // Unsubscribe
+        subscriptions.splice(subIndex, 1);
+        currentSubCount = Math.max(0, currentSubCount - 1);
+      } else {
+        // Subscribe
+        subscriptions.push(targetUid);
+        currentSubCount += 1;
+        isSubbed = true;
+      }
+
+      // Update creator's subscriber count in Firestore
+      transaction.set(targetUserRef, {
+        subscribersCount: currentSubCount
+      }, { merge: true });
+
+      // Update current user's subscriptions list in Firestore
+      transaction.set(currentUserRef, {
+        subscriptions: subscriptions
+      }, { merge: true });
+
+      // Update UI Counters & Buttons Immediately
+      const subDisplay = document.getElementById('sub-count-display');
+      if (subDisplay) subDisplay.innerText = currentSubCount.toLocaleString();
+
+      const modalSubDisplay = document.getElementById('profile-modal-subs');
+      if (modalSubDisplay) modalSubDisplay.innerText = currentSubCount.toLocaleString();
+
+      const modalSubBtn = document.getElementById('modal-sub-btn');
+      if (modalSubBtn) {
+        modalSubBtn.innerText = isSubbed ? 'Subscribed' : 'Subscribe';
+        modalSubBtn.className = isSubbed ? 'btn btn-gray' : 'btn btn-red';
+      }
+    });
+  } catch (err) {
+    console.error("Error toggling subscription:", err);
+    alert("Subscription failed: " + err.message);
+  }
 }
 
 // Helper to escape special HTML characters to prevent XSS issues
