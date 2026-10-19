@@ -168,7 +168,7 @@ async function uploadKidVideo(file, title, description) {
   }
 }
 
-// Loads and renders videos in the For You Page (FYP) feed with Likes, Comments & Share
+// Loads and renders videos with YouTube Thumbnail -> Player Switcher, Likes, Comments & Share
 async function loadFYP() {
   const fypContainer = document.getElementById('fyp-container');
   if (!fypContainer) return;
@@ -192,10 +192,14 @@ async function loadFYP() {
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       const videoId = docSnap.id;
+      const ytId = data.youtubeVideoId;
 
       const authorName = data.uploaderName || data.userName || 'Guest User';
       const uploaderUid = data.uploaderUid || data.userId || data.uid || data.authorId || '';
       const likesCount = data.likesCount || 0;
+
+      // High-res YouTube thumbnail URL with fallback
+      const thumbUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
 
       const card = document.createElement('div');
       card.className = 'video-card';
@@ -210,26 +214,25 @@ async function loadFYP() {
           Posted by <span onclick="event.stopPropagation(); openChannelProfile('${uploaderUid}')" style="color: #0088ff; cursor: pointer; font-weight: bold;">@${escapeHtml(authorName)}</span>
         </p>
         
-        <!-- Embedded YouTube Player -->
-        <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; background: #000;">
-          <iframe 
-            src="https://www.youtube-nocookie.com/embed/${data.youtubeVideoId}?autoplay=0&rel=0&modestbranding=1" 
-            title="${escapeHtml(data.title || 'StreamKids Video')}"
-            frameborder="0" 
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-            allowfullscreen
-            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;">
-          </iframe>
+        <!-- YouTube Thumbnail Container (Swaps to Player on Click) -->
+        <div id="media-container-${videoId}" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; background: #000; cursor: pointer;" onclick="playThumbnailVideo('${videoId}', '${ytId}')" title="Click to play video">
+          <img src="${thumbUrl}" alt="Video Thumbnail" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://via.placeholder.com/480x360?text=StreamKids+Video'" />
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border-radius: 50%; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; border: 2px solid #fff;">
+            <div style="width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-left: 20px solid #fff; margin-left: 4px;"></div>
+          </div>
         </div>
 
         ${data.description ? `<p style="margin-top: 8px; color: #dddddd;">${escapeHtml(data.description)}</p>` : ''}
 
-        <!-- Engagement Bar (Likes & Share) -->
-        <div style="display: flex; gap: 14px; margin-top: 12px; align-items: center;">
-          <button onclick="handleLikeVideo('${videoId}')" style="background: #222; color: #fff; border: 1px solid #444; padding: 6px 14px; border-radius: 16px; cursor: pointer;">
+        <!-- Engagement Bar (Likes, Comments & Share) -->
+        <div style="display: flex; gap: 10px; margin-top: 12px; align-items: center; flex-wrap: wrap;">
+          <button onclick="handleLikeVideo('${videoId}')" class="btn btn-gray" style="padding: 6px 12px; border-radius: 16px; font-size: 0.85rem; cursor: pointer;">
             👍 <span id="like-count-${videoId}">${likesCount}</span> Likes
           </button>
-          <button onclick="shareVideo('${data.youtubeVideoId}')" style="background: #222; color: #fff; border: 1px solid #444; padding: 6px 14px; border-radius: 16px; cursor: pointer;">
+          <button onclick="toggleComments('${videoId}')" class="btn btn-gray" style="padding: 6px 12px; border-radius: 16px; font-size: 0.85rem; cursor: pointer;">
+            💬 Comments
+          </button>
+          <button onclick="shareVideo('${ytId}')" class="btn btn-gray" style="padding: 6px 12px; border-radius: 16px; font-size: 0.85rem; cursor: pointer;">
             🔗 Share
           </button>
           ${checkIsAdmin() ? `
@@ -238,6 +241,17 @@ async function loadFYP() {
             </button>
           ` : ''}
         </div>
+
+        <!-- Collapsible Comment Box -->
+        <div id="comments-box-${videoId}" style="display: none; margin-top: 12px; background: #121212; padding: 10px; border-radius: 8px; border: 1px solid #222;">
+          <div id="comments-list-${videoId}" style="max-height: 180px; overflow-y: auto; margin-bottom: 8px;">
+            <p style="color: #888; font-size: 0.85rem;">Loading comments...</p>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" id="comment-input-${videoId}" placeholder="Write a comment..." class="dark-input flex-input" style="font-size: 0.85rem; padding: 6px 10px;">
+            <button onclick="postComment('${videoId}')" class="btn btn-blue" style="padding: 6px 12px; font-size: 0.85rem;">Send</button>
+          </div>
+        </div>
       `;
 
       fypContainer.appendChild(card);
@@ -245,6 +259,94 @@ async function loadFYP() {
   } catch (err) {
     console.error("Error loading FYP:", err);
     fypContainer.innerHTML = `<p style="color: #ff5555;">Error loading feed: ${err.message}</p>`;
+  }
+}
+
+// Swap Thumbnail for Live Embedded YouTube Player on Click
+function playThumbnailVideo(videoId, ytId) {
+  const container = document.getElementById(`media-container-${videoId}`);
+  if (!container) return;
+
+  container.innerHTML = `
+    <iframe 
+      src="https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0&modestbranding=1" 
+      title="StreamKids Video"
+      frameborder="0" 
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen
+      style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;">
+    5</iframe>
+  `;
+}
+
+// Toggle Comments Box Visibility
+function toggleComments(videoId) {
+  const commentBox = document.getElementById(`comments-box-${videoId}`);
+  if (!commentBox) return;
+
+  if (commentBox.style.display === 'none') {
+    commentBox.style.display = 'block';
+    loadVideoComments(videoId);
+  } else {
+    commentBox.style.display = 'none';
+  }
+}
+
+// Load Video Comments from Firestore
+function loadVideoComments(videoId) {
+  const container = document.getElementById(`comments-list-${videoId}`);
+  if (!container) return;
+
+  firebase.firestore().collection('videos').doc(videoId).collection('comments')
+    .orderBy('createdAt', 'desc')
+    .onSnapshot((snapshot) => {
+      if (snapshot.empty) {
+        container.innerHTML = '<p style="color: #888; font-size: 0.85rem; margin: 6px 0;">No comments yet. Be the first!</p>';
+        return;
+      }
+
+      container.innerHTML = '';
+      snapshot.forEach(doc => {
+        const c = doc.data();
+        const author = escapeHtml(c.authorName || 'Guest');
+        const text = escapeHtml(c.text || '');
+
+        const commentEl = document.createElement('div');
+        commentEl.style.cssText = "margin-bottom: 6px; font-size: 0.85rem; background: #111; padding: 6px 10px; border-radius: 6px;";
+        commentEl.innerHTML = `<strong style="color: #0088ff;">@${author}:</strong> <span style="color: #ddd;">${text}</span>`;
+        container.appendChild(commentEl);
+      });
+    }, (err) => {
+      console.error("Error loading comments:", err);
+    });
+}
+
+// Post a New Comment
+async function postComment(videoId) {
+  const user = firebase.auth().currentUser;
+  if (!user) {
+    alert("Please log in to leave a comment!");
+    return;
+  }
+
+  const input = document.getElementById(`comment-input-${videoId}`);
+  if (!input) return;
+
+  const text = input.value.trim();
+  if (!text) return;
+
+  try {
+    await firebase.firestore().collection('videos').doc(videoId).collection('comments').add({
+      text: text,
+      authorUid: user.uid,
+      authorName: user.displayName || user.email.split('@')[0],
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    input.value = ''; // Clear input
+  } catch (err) {
+    console.error("Failed to post comment:", err);
+    alert("Failed to post comment: " + err.message);
   }
 }
 
@@ -362,17 +464,13 @@ async function openChannelProfile(targetUid) {
     } else {
       videosSnapshot.forEach(doc => {
         const v = doc.data();
+        const ytId = v.youtubeVideoId;
+        const thumbUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+
         videoCardsHtml += `
           <div style="width: 280px; margin: 10px; display: inline-block; text-align: left; background: #181818; padding: 10px; border-radius: 8px; vertical-align: top;">
-            <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 6px; background: #000;">
-              <iframe 
-                src="https://www.youtube-nocookie.com/embed/${v.youtubeVideoId}?autoplay=0&rel=0&modestbranding=1" 
-                title="${escapeHtml(v.title || 'Video')}"
-                frameborder="0" 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                allowfullscreen
-                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;">
-              </iframe>
+            <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 6px; background: #000; cursor: pointer;" onclick="this.innerHTML='<iframe src=\\'https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0&modestbranding=1\\' frameborder=\\'0\\' allow=\\'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\\' allowfullscreen style=\\'position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;\\'></iframe>'">
+              <img src="${thumbUrl}" alt="Thumbnail" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;" />
             </div>
             <p style="font-weight: bold; margin: 8px 0 2px; color: #fff; font-size: 0.95rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(v.title || 'Untitled')}</p>
             ${v.description ? `<p style="color: #aaa; font-size: 0.8rem; margin: 0; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(v.description)}</p>` : ''}
@@ -569,6 +667,9 @@ window.loginWithGoogle = loginWithGoogle;
 window.logoutUser = logoutUser;
 window.uploadKidVideo = uploadKidVideo;
 window.loadFYP = loadFYP;
+window.playThumbnailVideo = playThumbnailVideo;
+window.toggleComments = toggleComments;
+window.postComment = postComment;
 window.openChannelProfile = openChannelProfile;
 window.uploadProfilePicture = uploadProfilePicture;
 window.editChannelDetails = editChannelDetails;
