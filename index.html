@@ -74,6 +74,7 @@
       gap: 10px;
       margin-bottom: 15px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .nav-btn {
@@ -173,6 +174,9 @@
 
     .btn-gray { background: #e0e0e0; color: #000000; }
     .btn-gray:hover { background: #ffffff; }
+
+    .btn-gold { background: #ffd700; color: #000000; }
+    .btn-gold:hover { background: #ffea70; }
 
     /* Viewers Counter Bar */
     .viewer-count-bar {
@@ -354,7 +358,7 @@
       padding: 12px;
       border-radius: 6px;
       margin-top: 15px;
-      border: 1px dashed #444444;
+      border: 1px dashed #ffd700;
     }
 
     /* News Ticker Animation for Shutdown Overlay */
@@ -395,7 +399,7 @@
       uploadKidVideo(fileInput.files[0], titleInput, descInput);
     }
 
-    // Admin Controls
+    // Global Admin Controls
     function shutdownApp() {
       const user = firebase.auth().currentUser;
       if (user && user.email && user.email.toLowerCase() === ADMIN_EMAIL) {
@@ -500,6 +504,7 @@
 
       const newStatus = !currentSelectedUserVerified;
 
+      // Updates Firestore globally so all users see the badge update instantly
       firebase.firestore().collection('users').doc(currentSelectedUid).update({
         isVerified: newStatus
       }).then(() => {
@@ -564,6 +569,7 @@
         const shutdownBtn = document.getElementById('shutdown-btn');
         const crashBtn = document.getElementById('crash-btn');
         const restoreBtn = document.getElementById('restore-btn');
+        const globalAdminPanel = document.getElementById('global-admin-panel');
 
         const isAdmin = user && user.email && user.email.toLowerCase() === ADMIN_EMAIL;
 
@@ -590,12 +596,14 @@
           if (shutdownBtn) shutdownBtn.style.display = isAdmin ? 'inline-block' : 'none';
           if (crashBtn) crashBtn.style.display = isAdmin ? 'inline-block' : 'none';
           if (restoreBtn) restoreBtn.style.display = isAdmin ? 'inline-block' : 'none';
+          if (globalAdminPanel) globalAdminPanel.style.display = isAdmin ? 'block' : 'none';
         } else {
           if (loginBtn) loginBtn.style.display = 'inline-block';
           if (userInfo) userInfo.style.display = 'none';
           if (shutdownBtn) shutdownBtn.style.display = 'none';
-          if (crashBtn) crashBtn.style.display = 'none';
-          if (restoreBtn) restoreBtn.style.display = 'none';
+          if (crashBtn) shutdownBtn.style.display = 'none';
+          if (restoreBtn) shutdownBtn.style.display = 'none';
+          if (globalAdminPanel) globalAdminPanel.style.display = 'none';
         }
       });
     });
@@ -626,6 +634,16 @@
     <button id="shutdown-btn" onclick="shutdownApp()" class="btn btn-red" style="display: none; margin-left: auto;">Shutdown Session</button>
     <button id="crash-btn" onclick="triggerAdminCrash()" class="btn btn-red" style="display: none; margin-left: 8px;">Simulate Crash</button>
   </nav>
+
+  <!-- 👑 Global Admin God Mode Studio Panel (Visible only to skibidiw63@gmail.com) -->
+  <div id="global-admin-panel" class="card-panel" style="display: none; border: 2px dashed #ffd700; background: #1a1800;">
+    <h2 style="color: #ffd700; display: flex; align-items: center; gap: 8px;">👑 StreamKids V4.9.9 Global God Mode Studio</h2>
+    <p style="color: #ccc; margin-bottom: 12px; font-size: 0.9rem;">Global overrides apply instantly across all connected user sessions worldwide.</p>
+    <div class="controls-bar">
+      <button onclick="adminOverrideStats(prompt('Enter Video ID or Document ID:'), 'videos', 'likesCount', prompt('Set New Global Like Count:'))" class="btn btn-gold">Global Override Likes</button>
+      <button onclick="adminOverrideStats(prompt('Enter User UID:'), 'users', 'subscribersCount', prompt('Set New Global Subscriber Count:'))" class="btn btn-gold">Global Override Subscribers</button>
+    </div>
+  </div>
 
   <!-- Main Live Dashboard -->
   <div id="feed" class="tab-content">
@@ -742,7 +760,7 @@
       <p id="profile-modal-email" style="color: #888; font-size: 0.85rem; margin-top: 4px;"></p>
 
       <div id="admin-verify-controls" class="admin-control-box" style="display: none;">
-        <p style="font-size: 0.8rem; color: #aaaaaa; margin-bottom: 8px;">Admin Verification Control</p>
+        <p style="font-size: 0.8rem; color: #ffd700; margin-bottom: 8px; font-weight: bold;">Global Admin Verification Control</p>
         <button id="toggle-verify-btn" onclick="toggleUserVerification()" class="btn btn-blue" style="font-size: 0.8rem; padding: 6px 12px; width: 100%;">
           Grant Verified Badge
         </button>
