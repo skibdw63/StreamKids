@@ -497,15 +497,11 @@ async function uploadProfilePictureFile(event, uid) {
     reader.onload = async (e) => {
       const base64Img = e.target.result;
 
+      // Save directly to Firestore (Auth updateProfile removed to fix length error)
       await firebase.firestore().collection('users').doc(uid).set({
         avatarUrl: base64Img,
         photoURL: base64Img
       }, { merge: true });
-
-      const currentUser = firebase.auth().currentUser;
-      if (currentUser) {
-        await currentUser.updateProfile({ photoURL: base64Img });
-      }
 
       const imgElem = document.getElementById('profile-modal-avatar');
       if (imgElem) imgElem.src = base64Img;
