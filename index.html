@@ -462,6 +462,8 @@
       const subsEl = document.getElementById('profile-modal-subs');
       const subBtnContainer = document.getElementById('modal-subscribe-container');
       const subBtn = document.getElementById('modal-sub-btn');
+      const ownerAvatarBtn = document.getElementById('owner-avatar-btn');
+      const ownerStudio = document.getElementById('owner-studio-controls');
       const adminControls = document.getElementById('admin-verify-controls');
       const toggleBtn = document.getElementById('toggle-verify-btn');
 
@@ -475,7 +477,7 @@
           const data = doc.data();
           nameEl.innerText = data.displayName || 'User';
           emailEl.innerText = data.email || '';
-          avatarEl.src = data.photoURL || 'https://via.placeholder.com/80';
+          avatarEl.src = data.photoURL || data.avatarUrl || 'https://via.placeholder.com/80';
           
           const subCount = data.subscribersCount || 0;
           if (subsEl) subsEl.innerText = subCount.toLocaleString();
@@ -483,11 +485,15 @@
           currentSelectedUserVerified = !!data.isVerified;
           badgeEl.style.display = currentSelectedUserVerified ? 'inline' : 'none';
 
-          // Hide subscribe button if viewing your own profile
+          // Show/Hide Owner vs Viewer Controls
           if (isSelf) {
             if (subBtnContainer) subBtnContainer.style.display = 'none';
+            if (ownerAvatarBtn) ownerAvatarBtn.style.display = 'flex';
+            if (ownerStudio) ownerStudio.style.display = 'block';
           } else {
             if (subBtnContainer) subBtnContainer.style.display = 'block';
+            if (ownerAvatarBtn) ownerAvatarBtn.style.display = 'none';
+            if (ownerStudio) ownerStudio.style.display = 'none';
 
             // Check if current user is subscribed
             let isSubscribed = false;
@@ -609,7 +615,7 @@
           if (userInfo) userInfo.style.display = 'flex';
           if (userName) userName.innerText = user.displayName || user.email;
           if (userAvatar) {
-            userAvatar.src = user.photoURL || 'https://via.placeholder.com/32';
+            userAvatar.src = user.photoURL || user.avatarUrl || 'https://via.placeholder.com/32';
           }
 
           const userRef = db.collection('users').doc(user.uid);
@@ -619,10 +625,16 @@
                 displayName: user.displayName || 'Anonymous',
                 email: user.email,
                 photoURL: user.photoURL || '',
+                avatarUrl: user.photoURL || '',
                 isVerified: isAdmin,
                 subscribersCount: 0,
                 subscriptions: []
               });
+            } else {
+              const data = doc.data();
+              if (userAvatar && (data.photoURL || data.avatarUrl)) {
+                userAvatar.src = data.avatarUrl || data.photoURL;
+              }
             }
           });
 
@@ -635,7 +647,7 @@
           if (userInfo) userInfo.style.display = 'none';
           if (shutdownBtn) shutdownBtn.style.display = 'none';
           if (crashBtn) shutdownBtn.style.display = 'none';
-          if (restoreBtn) restoreBtn.style.display = 'none';
+          if (restoreBtn) shutdownBtn.style.display = 'none';
           if (globalAdminPanel) globalAdminPanel.style.display = 'none';
         }
       });
@@ -785,8 +797,16 @@
     <div class="modal-content">
       <button class="close-btn" onclick="closeProfileModal()">✕</button>
       
-      <img id="profile-modal-avatar" class="profile-avatar-lg" src="https://via.placeholder.com/80" alt="Avatar">
-      <h2 style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+      <!-- Avatar with Owner Camera Overlay Button -->
+      <div style="position: relative; display: inline-block;">
+        <img id="profile-modal-avatar" class="profile-avatar-lg" src="https://via.placeholder.com/80" alt="Avatar">
+        <input type="file" id="modal-avatar-file-input" accept="image/*" style="display: none;" onchange="uploadProfilePictureFile(event, currentSelectedUid)">
+        <button id="owner-avatar-btn" onclick="triggerAvatarChange()" style="display: none; position: absolute; bottom: 12px; right: 0; background: #0088ff; color: #fff; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; align-items: center; justify-content: center; font-size: 14px;" title="Change Profile Picture">
+          📷
+        </button>
+      </div>
+
+      <h2 style="display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 5px;">
         <span id="profile-modal-name">Username</span>
         <span id="profile-modal-badge" class="badge-icon" style="display: none;" title="Verified Creator">☑️</span>
       </h2>
@@ -801,6 +821,17 @@
       <div id="modal-subscribe-container" style="margin-top: 10px;">
         <button id="modal-sub-btn" onclick="toggleSubscribe(currentSelectedUid)" class="btn btn-red" style="width: 100%; border-radius: 20px; padding: 10px; font-size: 1rem;">
           Subscribe
+        </button>
+      </div>
+
+      <!-- 🎨 Owner Channel Studio Controls (Visible only to Channel Owner) -->
+      <div id="owner-studio-controls" class="admin-control-box" style="display: none; border-color: #0088ff;">
+        <p style="font-size: 0.85rem; color: #0088ff; margin-bottom: 8px; font-weight: bold;">🎬 Channel Studio Controls</p>
+        <button onclick="editChannelName()" class="btn btn-blue" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; margin-bottom: 6px;">
+          ✏️ Edit Channel Name
+        </button>
+        <button onclick="triggerAvatarChange()" class="btn btn-gray" style="font-size: 0.8rem; padding: 6px 12px; width: 100%;">
+          🖼️ Change Profile Picture
         </button>
       </div>
 
