@@ -22,6 +22,33 @@ function logoutUser() {
   firebase.auth().signOut();
 }
 
+// ==========================================
+// 👑 V4.9.9 GOD MODE ADMIN HELPER
+// ==========================================
+function checkIsAdmin() {
+  const user = firebase.auth().currentUser;
+  return user && user.email === "skibidiw63@gmail.com";
+}
+
+// Admin function to force-update subscriber counts, views, or likes
+async function adminOverrideStats(targetId, collectionName, fieldName, newValue) {
+  if (!checkIsAdmin()) {
+    alert("Access Denied: Admin only!");
+    return;
+  }
+
+  try {
+    await firebase.firestore().collection(collectionName).doc(targetId).set({
+      [fieldName]: Number(newValue)
+    }, { merge: true });
+
+    alert(`[GOD MODE] Successfully set ${fieldName} to ${newValue}!`);
+  } catch (err) {
+    console.error("Admin override failed:", err);
+    alert("Failed to update stats: " + err.message);
+  }
+}
+
 // Automated Direct YouTube Resumable Upload
 async function uploadKidVideo(file, title, description) {
   const uploadStatus = document.getElementById('upload-status');
@@ -108,7 +135,7 @@ async function uploadKidVideo(file, title, description) {
 
     const currentUser = firebase.auth().currentUser;
 
-    // 3. Save Video ID to Firestore
+    // 3. Save Video ID & Engagement Stats to Firestore
     await firebase.firestore().collection('videos').add({
       title: title || 'StreamKids Video',
       description: description || 'Uploaded on StreamKids',
@@ -116,6 +143,9 @@ async function uploadKidVideo(file, title, description) {
       visibility: 'public',
       uploaderUid: currentUser ? currentUser.uid : 'guest',
       uploaderName: currentUser ? currentUser.displayName : 'Guest Creator',
+      likesCount: 0,
+      viewsCount: 0,
+      likedBy: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
@@ -138,7 +168,7 @@ async function uploadKidVideo(file, title, description) {
   }
 }
 
-// Loads and renders videos in the For You Page (FYP) feed using YouTube Embeds
+// Loads and renders videos in the For You Page (FYP) feed with Likes, Comments & Share
 async function loadFYP() {
   const fypContainer = document.getElementById('fyp-container');
   if (!fypContainer) return;
@@ -159,15 +189,20 @@ async function loadFYP() {
 
     fypContainer.innerHTML = ''; // Clear loading text
 
-    snapshot.forEach(doc => {
-      const data = doc.data();
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      const videoId = docSnap.id;
 
       const authorName = data.uploaderName || data.userName || 'Guest User';
       const uploaderUid = data.uploaderUid || data.userId || data.uid || data.authorId || '';
+      const likesCount = data.likesCount || 0;
 
       const card = document.createElement('div');
       card.className = 'video-card';
-      card.style.marginBottom = '20px';
+      card.style.marginBottom = '24px';
+      card.style.background = '#181818';
+      card.style.padding = '14px';
+      card.style.borderRadius = '10px';
 
       card.innerHTML = `
         <h3 style="color: #00ffcc; margin-bottom: 4px;">${escapeHtml(data.title || 'Untitled')}</h3>
@@ -188,6 +223,21 @@ async function loadFYP() {
         </div>
 
         ${data.description ? `<p style="margin-top: 8px; color: #dddddd;">${escapeHtml(data.description)}</p>` : ''}
+
+        <!-- Engagement Bar (Likes & Share) -->
+        <div style="display: flex; gap: 14px; margin-top: 12px; align-items: center;">
+          <button onclick="handleLikeVideo('${videoId}')" style="background: #222; color: #fff; border: 1px solid #444; padding: 6px 14px; border-radius: 16px; cursor: pointer;">
+            👍 <span id="like-count-${videoId}">${likesCount}</span> Likes
+          </button>
+          <button onclick="shareVideo('${data.youtubeVideoId}')" style="background: #222; color: #fff; border: 1px solid #444; padding: 6px 14px; border-radius: 16px; cursor: pointer;">
+            🔗 Share
+          </button>
+          ${checkIsAdmin() ? `
+            <button onclick="adminOverrideStats('${videoId}', 'videos', 'likesCount', prompt('Set new like count:', '${likesCount}'))" style="background: #ffd700; color: #000; border: none; padding: 4px 10px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 11px;">
+              👑 Edit Likes
+            </button>
+          ` : ''}
+        </div>
       `;
 
       fypContainer.appendChild(card);
@@ -195,6 +245,62 @@ async function loadFYP() {
   } catch (err) {
     console.error("Error loading FYP:", err);
     fypContainer.innerHTML = `<p style="color: #ff5555;">Error loading feed: ${err.message}</p>`;
+  }
+}
+
+// ==========================================
+// 💖 V4.9.9 LIKES & SHARE HANDLERS
+// ==========================================
+async function handleLikeVideo(videoId) {
+  const user = firebase.auth().currentUser;
+  if (!user) {
+    alert("Please log in with Google to like videos!");
+    return;
+  }
+
+  const videoRef = firebase.firestore().collection('videos').doc(videoId);
+  
+  try {
+    await firebase.firestore().runTransaction(async (transaction) => {
+      const doc = await transaction.get(videoRef);
+      if (!doc.exists) throw "Video does not exist!";
+
+      const data = doc.data();
+      const likedBy = data.likedBy || [];
+      const userIndex = likedBy.indexOf(user.uid);
+      
+      let newLikesCount = data.likesCount || 0;
+
+      if (userIndex > -1) {
+        // Unlike
+        likedBy.splice(userIndex, 1);
+        newLikesCount = Math.max(0, newLikesCount - 1);
+      } else {
+        // Like
+        likedBy.push(user.uid);
+        newLikesCount += 1;
+      }
+
+      transaction.update(videoRef, {
+        likesCount: newLikesCount,
+        likedBy: likedBy
+      });
+
+      const countSpan = document.getElementById(`like-count-${videoId}`);
+      if (countSpan) countSpan.innerText = newLikesCount;
+    });
+  } catch (err) {
+    console.error("Error liking video:", err);
+  }
+}
+
+async function shareVideo(youtubeVideoId) {
+  const shareUrl = `https://youtu.be/${youtubeVideoId}`;
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    alert("Video link copied to clipboard!");
+  } catch (err) {
+    console.error("Failed to copy link:", err);
   }
 }
 
@@ -215,6 +321,7 @@ async function openChannelProfile(targetUid) {
 
   const currentUser = firebase.auth().currentUser;
   const isOwner = currentUser && currentUser.uid === targetUid;
+  const isAdminUser = checkIsAdmin();
 
   showTab('profile-tab');
   profileContainer.innerHTML = '<p style="color: #aaa;">Loading channel...</p>';
@@ -225,6 +332,7 @@ async function openChannelProfile(targetUid) {
 
     const displayName = userData.displayName || 'StreamKids Creator';
     const handle = userData.handle || `@user_${targetUid.substring(0, 5)}`;
+    const subscribersCount = userData.subscribersCount || 1;
     
     let avatarUrl = userData.avatarUrl;
     if (!avatarUrl || avatarUrl.includes('apppicture.png')) {
@@ -288,16 +396,22 @@ async function openChannelProfile(targetUid) {
 
           <div>
             <h2 style="margin: 0; font-size: 1.8rem;">${escapeHtml(displayName)}</h2>
-            <p style="margin: 4px 0; color: #aaa;">${escapeHtml(handle)}</p>
+            <p style="margin: 4px 0; color: #aaa;">${escapeHtml(handle)} • <span id="sub-count-display">${subscribersCount}</span> subscribers</p>
             <p style="margin: 4px 0; color: #ddd; font-size: 0.9rem;">${escapeHtml(bio)}</p>
 
-            <div style="margin-top: 12px; display: flex; gap: 10px;">
+            <div style="margin-top: 12px; display: flex; gap: 10px; align-items: center;">
               ${isOwner ? `
                 <button onclick="editChannelDetails()" style="padding: 8px 16px; background: #333; color: #fff; border: 1px solid #555; border-radius: 20px; cursor: pointer;">Customize channel</button>
                 <button onclick="manageVideos()" style="padding: 8px 16px; background: #333; color: #fff; border: 1px solid #555; border-radius: 20px; cursor: pointer;">Manage videos</button>
               ` : `
                 <button onclick="toggleSubscribe('${targetUid}')" style="padding: 8px 18px; background: #cc0000; color: #fff; border: none; border-radius: 20px; font-weight: bold; cursor: pointer;">Subscribe</button>
               `}
+
+              ${isAdminUser ? `
+                <button onclick="adminOverrideStats('${targetUid}', 'users', 'subscribersCount', prompt('Set new subscriber count:', '${subscribersCount}'))" style="background: #ffd700; color: #000; border: none; padding: 6px 14px; border-radius: 16px; font-weight: bold; cursor: pointer; font-size: 12px;">
+                  👑 Edit Subscribers
+                </button>
+              ` : ''}
             </div>
           </div>
         </div>
@@ -391,3 +505,6 @@ window.editChannelDetails = editChannelDetails;
 window.manageVideos = manageVideos;
 window.toggleSubscribe = toggleSubscribe;
 window.handleFileSelect = handleFileSelect;
+window.handleLikeVideo = handleLikeVideo;
+window.shareVideo = shareVideo;
+window.adminOverrideStats = adminOverrideStats;
