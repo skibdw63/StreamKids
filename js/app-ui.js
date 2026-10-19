@@ -275,7 +275,7 @@ function playThumbnailVideo(videoId, ytId) {
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
       allowfullscreen
       style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;">
-    5</iframe>
+    </iframe>
   `;
 }
 
@@ -436,7 +436,7 @@ async function openChannelProfile(targetUid) {
     const handle = userData.handle || `@user_${targetUid.substring(0, 5)}`;
     const subscribersCount = userData.subscribersCount || 0;
     
-    let avatarUrl = userData.avatarUrl;
+    let avatarUrl = userData.avatarUrl || userData.photoURL;
     if (!avatarUrl || avatarUrl.includes('apppicture.png')) {
       avatarUrl = 'https://via.placeholder.com/150';
     }
@@ -487,8 +487,8 @@ async function openChannelProfile(targetUid) {
                  onerror="this.onerror=null;this.src='https://via.placeholder.com/150';" 
                  style="width: 110px; height: 110px; border-radius: 50%; object-fit: cover; border: 2px solid #333; background: #222;" />
             ${isOwner ? `
-              <button onclick="document.getElementById('avatar-file-input').click()" style="position: absolute; bottom: 0; right: 0; background: #0088ff; border: none; color: #fff; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Change Picture">📷</button>
-              <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="uploadProfilePicture(event, '${targetUid}')" />
+              <button onclick="triggerAvatarChange()" style="position: absolute; bottom: 0; right: 0; background: #0088ff; border: none; color: #fff; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Change Picture">📷</button>
+              <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="uploadProfilePictureFile(event, '${targetUid}')" />
             ` : ''}
           </div>
 
@@ -497,10 +497,10 @@ async function openChannelProfile(targetUid) {
             <p style="margin: 4px 0; color: #aaa;">${escapeHtml(handle)} • <span id="sub-count-display">${subscribersCount}</span> subscribers</p>
             <p style="margin: 4px 0; color: #ddd; font-size: 0.9rem;">${escapeHtml(bio)}</p>
 
-            <div style="margin-top: 12px; display: flex; gap: 10px; align-items: center;">
+            <div style="margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
               ${isOwner ? `
-                <button onclick="editChannelDetails()" style="padding: 8px 16px; background: #333; color: #fff; border: 1px solid #555; border-radius: 20px; cursor: pointer;">Customize channel</button>
-                <button onclick="manageVideos()" style="padding: 8px 16px; background: #333; color: #fff; border: 1px solid #555; border-radius: 20px; cursor: pointer;">Manage videos</button>
+                <button onclick="editChannelName()" style="padding: 8px 16px; background: #0077ff; color: #fff; border: none; border-radius: 20px; cursor: pointer; font-weight: bold;">✏️ Edit Channel Name</button>
+                <button onclick="triggerAvatarChange()" style="padding: 8px 16px; background: #333; color: #fff; border: 1px solid #555; border-radius: 20px; cursor: pointer;">🖼️ Change Avatar</button>
               ` : `
                 <button onclick="toggleSubscribe('${targetUid}')" style="padding: 8px 18px; background: #cc0000; color: #fff; border: none; border-radius: 20px; font-weight: bold; cursor: pointer;">Subscribe</button>
               `}
@@ -529,31 +529,108 @@ async function openChannelProfile(targetUid) {
   }
 }
 
-// Upload and Update Profile Picture (Owner only)
-async function uploadProfilePicture(event, uid) {
+// ==========================================
+// 🎨 CHANNEL BUILDER & STUDIO (Owner Tools)
+// ==========================================
+function triggerAvatarChange() {
+  const choice = prompt("Type '1' to enter an Image URL link, or '2' to upload an image file from your device:", "1");
+  if (choice === "1") {
+    changeProfilePictureUrl();
+  } else if (choice === "2") {
+    const fileInput = document.getElementById('avatar-file-input');
+    if (fileInput) fileInput.click();
+  }
+}
+
+async function changeProfilePictureUrl() {
+  const currentUser = firebase.auth().currentUser;
+  if (!currentUser) return;
+
+  const newUrl = prompt("Paste the direct image URL for your channel avatar:");
+  if (!newUrl || !newUrl.trim()) return;
+
+  try {
+    const cleanUrl = newUrl.trim();
+
+    await firebase.firestore().collection('users').doc(currentUser.uid).set({
+      avatarUrl: cleanUrl,
+      photoURL: cleanUrl
+    }, { merge: true });
+
+    await currentUser.updateProfile({ photoURL: cleanUrl });
+
+    const imgElem = document.getElementById('profile-avatar-img');
+    if (imgElem) imgElem.src = cleanUrl;
+
+    const navAvatar = document.getElementById('user-avatar');
+    if (navAvatar) navAvatar.src = cleanUrl;
+
+    alert("Channel profile picture updated successfully!");
+  } catch (err) {
+    console.error("Failed to update profile picture URL:", err);
+    alert("Failed to update picture: " + err.message);
+  }
+}
+
+async function uploadProfilePictureFile(event, uid) {
   const file = event.target.files[0];
   if (!file) return;
 
   try {
-    const fileName = `avatars/${uid}_${Date.now()}`;
-    const { data, error } = await supabase.storage.from('streamkids-videos').upload(fileName, file);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64Img = e.target.result;
 
-    if (error) throw error;
+      await firebase.firestore().collection('users').doc(uid).set({
+        avatarUrl: base64Img,
+        photoURL: base64Img
+      }, { merge: true });
 
-    const { data: publicUrlData } = supabase.storage.from('streamkids-videos').getPublicUrl(fileName);
-    const newAvatarUrl = publicUrlData.publicUrl;
+      const currentUser = firebase.auth().currentUser;
+      if (currentUser) {
+        await currentUser.updateProfile({ photoURL: base64Img });
+      }
 
-    await firebase.firestore().collection('users').doc(uid).set({
-      avatarUrl: newAvatarUrl
+      const imgElem = document.getElementById('profile-avatar-img');
+      if (imgElem) imgElem.src = base64Img;
+
+      const navAvatar = document.getElementById('user-avatar');
+      if (navAvatar) navAvatar.src = base64Img;
+
+      alert("Channel profile picture uploaded successfully!");
+    };
+    reader.readAsDataURL(file);
+  } catch (err) {
+    console.error("Failed to upload profile picture file:", err);
+    alert("Upload failed: " + err.message);
+  }
+}
+
+async function editChannelName() {
+  const currentUser = firebase.auth().currentUser;
+  if (!currentUser) return;
+
+  const newName = prompt("Enter your new Channel Name:");
+  if (!newName || !newName.trim()) return;
+
+  try {
+    const cleanName = newName.trim();
+
+    await firebase.firestore().collection('users').doc(currentUser.uid).set({
+      displayName: cleanName
     }, { merge: true });
 
-    const imgElem = document.getElementById('profile-avatar-img');
-    if (imgElem) imgElem.src = newAvatarUrl;
+    await currentUser.updateProfile({ displayName: cleanName });
 
-    alert("Profile picture updated successfully!");
+    const navName = document.getElementById('user-name');
+    if (navName) navName.innerText = cleanName;
+
+    // Refresh profile view
+    openChannelProfile(currentUser.uid);
+    alert("Channel name updated successfully!");
   } catch (err) {
-    console.error("Failed to update profile picture:", err);
-    alert("Failed to upload image: " + err.message);
+    console.error("Failed to update channel name:", err);
+    alert("Failed to update name: " + err.message);
   }
 }
 
@@ -671,7 +748,10 @@ window.playThumbnailVideo = playThumbnailVideo;
 window.toggleComments = toggleComments;
 window.postComment = postComment;
 window.openChannelProfile = openChannelProfile;
-window.uploadProfilePicture = uploadProfilePicture;
+window.triggerAvatarChange = triggerAvatarChange;
+window.changeProfilePictureUrl = changeProfilePictureUrl;
+window.uploadProfilePictureFile = uploadProfilePictureFile;
+window.editChannelName = editChannelName;
 window.editChannelDetails = editChannelDetails;
 window.manageVideos = manageVideos;
 window.toggleSubscribe = toggleSubscribe;
