@@ -320,36 +320,46 @@
 
     .modal-content {
       background: #1e1e1e;
-      padding: 25px;
       border-radius: 8px;
       width: 90%;
-      max-width: 420px;
+      max-width: 460px;
       text-align: center;
       position: relative;
       border: 1px solid #333333;
+      padding: 0;
+      overflow: hidden;
     }
 
     .close-btn {
       position: absolute;
       top: 10px;
       right: 15px;
-      background: none;
+      background: rgba(0, 0, 0, 0.5);
       border: none;
       color: #aaaaaa;
-      font-size: 1.4rem;
+      font-size: 1.2rem;
       cursor: pointer;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .close-btn:hover {
       color: #ffffff;
+      background: rgba(0, 0, 0, 0.8);
     }
 
     .profile-avatar-lg {
       width: 80px;
       height: 80px;
       border-radius: 50%;
-      margin-bottom: 10px;
-      border: 2px solid #0088ff;
+      margin-bottom: 5px;
+      border: 3px solid #1e1e1e;
+      background: #222;
       object-fit: cover;
     }
 
@@ -359,6 +369,7 @@
       border-radius: 6px;
       margin-top: 15px;
       border: 1px dashed #ffd700;
+      text-align: left;
     }
 
     /* News Ticker Animation for Shutdown Overlay */
@@ -384,6 +395,8 @@
       const fileInput = document.getElementById('video-file-input');
       const titleInput = document.getElementById('video-title-input').value;
       const descInput = document.getElementById('video-desc-input').value;
+      const categorySelect = document.getElementById('video-category-select');
+      const category = categorySelect ? categorySelect.value : 'gaming';
 
       if (!fileInput.files.length) {
         alert("Please select a video file first!");
@@ -395,8 +408,8 @@
         return;
       }
 
-      // Calls the Render + YouTube Backend Upload function in app-ui.js
-      uploadKidVideo(fileInput.files[0], titleInput, descInput);
+      // Calls the Render + YouTube Backend Upload function with category included
+      uploadKidVideo(fileInput.files[0], titleInput, descInput, category);
     }
 
     // Global Admin Controls
@@ -458,6 +471,9 @@
       const nameEl = document.getElementById('profile-modal-name');
       const emailEl = document.getElementById('profile-modal-email');
       const avatarEl = document.getElementById('profile-modal-avatar');
+      const bannerEl = document.getElementById('profile-modal-banner');
+      const bioEl = document.getElementById('profile-modal-bio');
+      const socialEl = document.getElementById('profile-modal-social');
       const badgeEl = document.getElementById('profile-modal-badge');
       const subsEl = document.getElementById('profile-modal-subs');
       const subBtnContainer = document.getElementById('modal-subscribe-container');
@@ -478,6 +494,14 @@
           nameEl.innerText = data.displayName || 'User';
           emailEl.innerText = data.email || '';
           avatarEl.src = data.photoURL || data.avatarUrl || 'https://via.placeholder.com/80';
+          
+          const bannerUrl = data.bannerUrl || 'https://via.placeholder.com/600x150?text=StreamKids+Banner';
+          if (bannerEl) bannerEl.style.backgroundImage = `url('${bannerUrl}')`;
+
+          if (bioEl) bioEl.innerText = data.bio || 'Welcome to my official StreamKids channel!';
+          if (socialEl) {
+            socialEl.innerHTML = data.socialLink ? `<a href="${data.socialLink}" target="_blank" style="color: #0088ff; text-decoration: none;">🔗 ${data.socialLink}</a>` : '';
+          }
           
           const subCount = data.subscribersCount || 0;
           if (subsEl) subsEl.innerText = subCount.toLocaleString();
@@ -626,6 +650,9 @@
                 email: user.email,
                 photoURL: user.photoURL || '',
                 avatarUrl: user.photoURL || '',
+                bannerUrl: '',
+                bio: 'Welcome to my official StreamKids channel!',
+                socialLink: '',
                 isVerified: isAdmin,
                 subscribersCount: 0,
                 subscriptions: []
@@ -646,8 +673,8 @@
           if (loginBtn) loginBtn.style.display = 'inline-block';
           if (userInfo) userInfo.style.display = 'none';
           if (shutdownBtn) shutdownBtn.style.display = 'none';
-          if (crashBtn) shutdownBtn.style.display = 'none';
-          if (restoreBtn) shutdownBtn.style.display = 'none';
+          if (crashBtn) crashBtn.style.display = 'none';
+          if (restoreBtn) restoreBtn.style.display = 'none';
           if (globalAdminPanel) globalAdminPanel.style.display = 'none';
         }
       });
@@ -760,6 +787,17 @@
         <input type="text" id="video-title-input" placeholder="Video Title" class="dark-input full-width" aria-label="Video Title"><br><br>
         <textarea id="video-desc-input" placeholder="Description..." class="dark-input full-width" style="height: 80px;" aria-label="Video Description"></textarea><br><br>
 
+        <!-- 🔍 Category Selection -->
+        <div style="margin-bottom: 15px;">
+          <label style="font-size: 0.9rem; color: #aaa; display: block; margin-bottom: 5px;">Category:</label>
+          <select id="video-category-select" class="dark-input full-width">
+            <option value="gaming">Gaming</option>
+            <option value="music">Music</option>
+            <option value="tutorials">Tutorials</option>
+            <option value="irl">IRL / Vlogs</option>
+          </select>
+        </div>
+
         <div style="margin-bottom: 15px;">
           <label style="margin-right: 15px;"><input type="radio" name="video-visibility" value="public" checked> Public</label>
           <label><input type="radio" name="video-visibility" value="private"> Private</label>
@@ -775,6 +813,20 @@
   <div id="fyp-tab" class="tab-content" style="display: none;">
     <div class="card-panel">
       <h2>For You Feed</h2>
+      
+      <!-- 🔍 Search & Category Filter Bar -->
+      <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+        <input type="text" id="fyp-search-input" placeholder="Search videos by title or creator..." class="dark-input" style="flex: 1; min-width: 220px;" oninput="filterFYPFeed()">
+        
+        <select id="fyp-category-select" class="dark-input" style="width: 160px;" onchange="filterFYPFeed()">
+          <option value="all">All Categories</option>
+          <option value="gaming">Gaming</option>
+          <option value="music">Music</option>
+          <option value="tutorials">Tutorials</option>
+          <option value="irl">IRL / Vlogs</option>
+        </select>
+      </div>
+
       <div id="fyp-container" class="fyp-feed"></div>
     </div>
   </div>
@@ -797,53 +849,68 @@
     <div class="modal-content">
       <button class="close-btn" onclick="closeProfileModal()">✕</button>
       
-      <!-- Avatar with Owner Camera Overlay Button -->
-      <div style="position: relative; display: inline-block;">
-        <img id="profile-modal-avatar" class="profile-avatar-lg" src="https://via.placeholder.com/80" alt="Avatar">
-        <input type="file" id="modal-avatar-file-input" accept="image/*" style="display: none;" onchange="uploadProfilePictureFile(event, currentSelectedUid)">
-        <button id="owner-avatar-btn" onclick="triggerAvatarChange()" style="display: none; position: absolute; bottom: 12px; right: 0; background: #0088ff; color: #fff; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; align-items: center; justify-content: center; font-size: 14px;" title="Change Profile Picture">
-          📷
-        </button>
-      </div>
+      <!-- 🖼️ Channel Banner Header -->
+      <div id="profile-modal-banner" style="width: 100%; height: 110px; background: #333; background-size: cover; background-position: center; position: relative;"></div>
 
-      <h2 style="display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 5px;">
-        <span id="profile-modal-name">Username</span>
-        <span id="profile-modal-badge" class="badge-icon" style="display: none;" title="Verified Creator">☑️</span>
-      </h2>
-      <p id="profile-modal-email" style="color: #888; font-size: 0.85rem; margin-top: 4px;"></p>
+      <div style="padding: 0 25px 25px 25px; position: relative;">
+        <!-- Avatar overlapping banner with Owner Camera Overlay Button -->
+        <div style="position: relative; display: inline-block; margin-top: -45px;">
+          <img id="profile-modal-avatar" class="profile-avatar-lg" src="https://via.placeholder.com/80" alt="Avatar">
+          <input type="file" id="modal-avatar-file-input" accept="image/*" style="display: none;" onchange="uploadProfilePictureFile(event, currentSelectedUid)">
+          <button id="owner-avatar-btn" onclick="triggerAvatarChange()" style="display: none; position: absolute; bottom: 12px; right: 0; background: #0088ff; color: #fff; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; align-items: center; justify-content: center; font-size: 14px;" title="Change Profile Picture">
+            📷
+          </button>
+        </div>
 
-      <!-- 👥 Subscriber Count Display -->
-      <p style="color: #00ffcc; font-size: 1rem; font-weight: bold; margin: 10px 0;">
-        👥 <span id="profile-modal-subs">0</span> Subscribers
-      </p>
+        <h2 style="display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 5px;">
+          <span id="profile-modal-name">Username</span>
+          <span id="profile-modal-badge" class="badge-icon" style="display: none;" title="Verified Creator">☑️</span>
+        </h2>
+        <p id="profile-modal-email" style="color: #888; font-size: 0.85rem; margin-top: 2px;"></p>
 
-      <!-- 🔴 Subscribe Button -->
-      <div id="modal-subscribe-container" style="margin-top: 10px;">
-        <button id="modal-sub-btn" onclick="toggleSubscribe(currentSelectedUid)" class="btn btn-red" style="width: 100%; border-radius: 20px; padding: 10px; font-size: 1rem;">
-          Subscribe
-        </button>
-      </div>
+        <!-- 📝 Bio & Social Links -->
+        <p id="profile-modal-bio" style="color: #ddd; font-size: 0.9rem; margin: 8px 0; font-style: italic;"></p>
+        <p id="profile-modal-social" style="color: #0088ff; font-size: 0.85rem; margin-bottom: 8px;"></p>
 
-      <!-- 🎨 Owner Channel Studio Controls (Visible only to Channel Owner) -->
-      <div id="owner-studio-controls" class="admin-control-box" style="display: none; border-color: #0088ff;">
-        <p style="font-size: 0.85rem; color: #0088ff; margin-bottom: 8px; font-weight: bold;">🎬 Channel Studio Controls</p>
-        <button onclick="editChannelName()" class="btn btn-blue" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; margin-bottom: 6px;">
-          ✏️ Edit Channel Name
-        </button>
-        <button onclick="triggerAvatarChange()" class="btn btn-gray" style="font-size: 0.8rem; padding: 6px 12px; width: 100%;">
-          🖼️ Change Profile Picture
-        </button>
-      </div>
+        <!-- 👥 Subscriber Count Display -->
+        <p style="color: #00ffcc; font-size: 1rem; font-weight: bold; margin: 10px 0;">
+          👥 <span id="profile-modal-subs">0</span> Subscribers
+        </p>
 
-      <!-- 👑 Admin Verification & Override Controls -->
-      <div id="admin-verify-controls" class="admin-control-box" style="display: none;">
-        <p style="font-size: 0.8rem; color: #ffd700; margin-bottom: 8px; font-weight: bold;">👑 Global Admin Controls</p>
-        <button id="toggle-verify-btn" onclick="toggleUserVerification()" class="btn btn-blue" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; margin-bottom: 6px;">
-          Grant Verified Badge
-        </button>
-        <button onclick="adminOverrideStats(currentSelectedUid, 'users', 'subscribersCount', prompt('Set New Global Subscriber Count:'))" class="btn btn-gold" style="font-size: 0.8rem; padding: 6px 12px; width: 100%;">
-          👑 Override Subscribers
-        </button>
+        <!-- 🔴 Subscribe Button -->
+        <div id="modal-subscribe-container" style="margin-top: 10px;">
+          <button id="modal-sub-btn" onclick="toggleSubscribe(currentSelectedUid)" class="btn btn-red" style="width: 100%; border-radius: 20px; padding: 10px; font-size: 1rem;">
+            Subscribe
+          </button>
+        </div>
+
+        <!-- 🎨 Owner Channel Studio Controls (Visible only to Channel Owner) -->
+        <div id="owner-studio-controls" class="admin-control-box" style="display: none; border-color: #0088ff;">
+          <p style="font-size: 0.85rem; color: #0088ff; margin-bottom: 8px; font-weight: bold; text-align: center;">🎬 Channel Studio Controls</p>
+          <button onclick="editChannelName()" class="btn btn-blue" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; margin-bottom: 6px;">
+            ✏️ Edit Channel Name
+          </button>
+          <button onclick="editChannelBio()" class="btn btn-gray" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; margin-bottom: 6px; background: #333; color:#fff;">
+            📝 Edit Bio & Social Link
+          </button>
+          <button onclick="triggerBannerChange()" class="btn btn-gray" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; margin-bottom: 6px;">
+            🖼️ Change Banner Image
+          </button>
+          <button onclick="triggerAvatarChange()" class="btn btn-gray" style="font-size: 0.8rem; padding: 6px 12px; width: 100%;">
+            📷 Change Profile Picture
+          </button>
+        </div>
+
+        <!-- 👑 Admin Verification & Override Controls -->
+        <div id="admin-verify-controls" class="admin-control-box" style="display: none;">
+          <p style="font-size: 0.8rem; color: #ffd700; margin-bottom: 8px; font-weight: bold; text-align: center;">👑 Global Admin Controls</p>
+          <button id="toggle-verify-btn" onclick="toggleUserVerification()" class="btn btn-blue" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; margin-bottom: 6px;">
+            Grant Verified Badge
+          </button>
+          <button onclick="adminOverrideStats(currentSelectedUid, 'users', 'subscribersCount', prompt('Set New Global Subscriber Count:'))" class="btn btn-gold" style="font-size: 0.8rem; padding: 6px 12px; width: 100%;">
+            👑 Override Subscribers
+          </button>
+        </div>
       </div>
     </div>
   </div>
