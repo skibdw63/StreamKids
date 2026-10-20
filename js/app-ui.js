@@ -83,6 +83,14 @@ async function grantOwnerVerifiedPackage(targetUid) {
     return;
   }
 
+  if (!targetUid || !targetUid.trim()) {
+    alert("Invalid User UID provided.");
+    return;
+  }
+
+  const cleanUid = targetUid.trim();
+  const db = firebase.firestore();
+
   const badgeObj = {
     id: "owner_verified",
     title: "Owner Verified",
@@ -90,13 +98,25 @@ async function grantOwnerVerifiedPackage(targetUid) {
     unlockedAt: new Date().toISOString()
   };
 
-  await firebase.firestore().collection('users').doc(targetUid).set({
-    isOwnerVerified: true,
-    unlockedPackages: firebase.firestore.FieldValue.arrayUnion("owner_verified"),
-    badges: firebase.firestore.FieldValue.arrayUnion(badgeObj)
-  }, { merge: true });
+  try {
+    await db.collection('users').doc(cleanUid).set({
+      isOwnerVerified: true,
+      activeTheme: 'owner_verified',
+      unlockedPackages: firebase.firestore.FieldValue.arrayUnion("owner_verified"),
+      badges: firebase.firestore.FieldValue.arrayUnion(badgeObj)
+    }, { merge: true });
 
-  alert("🔨 Owner Verified package successfully granted!");
+    alert("🔨 Owner Verified package & full theme successfully granted!");
+    
+    const currentUser = firebase.auth().currentUser;
+    if (currentUser && currentUser.uid === cleanUid) {
+      loadAndApplyUserTheme(cleanUid);
+      openChannelProfile(cleanUid);
+    }
+  } catch (err) {
+    console.error("Failed to grant Owner Verified package:", err);
+    alert("Error: " + err.message);
+  }
 }
 
 // Admin function to force-update subscriber counts, views, or likes
@@ -193,8 +213,9 @@ async function redeemKidPackageCode() {
     alert("🎉 SUCCESS! Package successfully redeemed and unlocked!");
     inputEl.value = '';
     
-    // Refresh user profile & active branding
+    // Refresh user profile & active branding instantly
     loadAndApplyUserTheme(user.uid);
+    openChannelProfile(user.uid);
   } catch (err) {
     console.error("Redemption failed:", err);
     alert(err.message);
@@ -236,33 +257,37 @@ async function loadAndApplyUserTheme(uid) {
 
 function applyThemeBranding(themeKey) {
   const logoContainer = document.getElementById('app-logo-title');
+  const bodyEl = document.body;
   if (!logoContainer) return;
 
   switch (themeKey) {
     case 'owner_verified':
       logoContainer.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="color: #0088ff; font-weight: bold; font-size: 1.2rem;">StreamKids</span>
-          <span style="background: linear-gradient(90deg, #ff0000, #ff8800); color: #fff; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; font-weight: bold; letter-spacing: 0.5px;">
+          <span style="color: #ff4444; font-weight: bold; font-size: 1.2rem;">StreamKids</span>
+          <span style="background: linear-gradient(90deg, #ff0000, #ff8800); color: #fff; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; font-weight: bold; letter-spacing: 0.5px; box-shadow: 0 0 10px rgba(255,0,0,0.5);">
             🔨 OWNER VERIFIED
           </span>
         </div>
       `;
+      if (bodyEl) bodyEl.style.borderTop = "4px solid #ff4444";
       break;
 
     case 'star_creator':
       logoContainer.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="color: #0088ff; font-weight: bold; font-size: 1.2rem;">StreamKids</span>
-          <span style="background: linear-gradient(90deg, #ff007f, #7928ca); color: #fff; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; font-weight: bold; letter-spacing: 0.5px;">
+          <span style="color: #00ffcc; font-weight: bold; font-size: 1.2rem; text-shadow: 0 0 8px rgba(0,255,204,0.4);">StreamKids</span>
+          <span style="background: linear-gradient(90deg, #0088ff, #00ffcc); color: #000; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; font-weight: bold; letter-spacing: 0.5px; box-shadow: 0 0 10px rgba(0,255,204,0.4);">
             ⭐ STAR CREATOR
           </span>
         </div>
       `;
+      if (bodyEl) bodyEl.style.borderTop = "4px solid #00ffcc";
       break;
 
     default:
       logoContainer.innerHTML = `<span style="color: #0088ff; font-weight: bold; font-size: 1.2rem;">StreamKids</span>`;
+      if (bodyEl) bodyEl.style.borderTop = "none";
       break;
   }
 }
@@ -362,7 +387,6 @@ async function uploadKidVideo(file, title, description, category = 'gaming') {
 
     const currentUser = firebase.auth().currentUser;
     
-    // Check if uploader is Star Creator or Owner Verified to attach badge flags
     let isStarUploader = false;
     let isOwnerUploader = false;
     if (currentUser) {
@@ -488,7 +512,7 @@ function renderFYPList(videos) {
       <p style="color: #aaaaaa; font-size: 0.9rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
         Posted by <span onclick="event.stopPropagation(); openChannelProfile('${uploaderUid}')" style="color: #0088ff; cursor: pointer; font-weight: bold;">@${escapeHtml(authorName)}</span>
         ${isOwnerUploader ? `<span style="background: linear-gradient(90deg, #ff0000, #ff8800); color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px;">🔨 OWNER VERIFIED</span>` : ''}
-        ${isStarUploader && !isOwnerUploader ? `<span style="background: linear-gradient(90deg, #ff007f, #0088ff); color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px;">⭐ STAR CREATOR</span>` : ''}
+        ${isStarUploader && !isOwnerUploader ? `<span style="background: linear-gradient(90deg, #0088ff, #00ffcc); color: #000; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px;">⭐ STAR CREATOR</span>` : ''}
       </p>
       
       <div id="media-container-${videoId}" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; background: #000; cursor: pointer;" onclick="playThumbnailVideo('${videoId}', '${ytId}')" title="Click to play video">
