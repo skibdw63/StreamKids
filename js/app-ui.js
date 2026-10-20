@@ -139,6 +139,203 @@ async function adminOverrideStats(targetId, collectionName, fieldName, newValue)
 }
 
 // ==========================================
+// 👑 ADMIN GOD MODE: GRANT STAR COINS
+// ==========================================
+async function adminGrantStarCoins(targetUid, amount) {
+  if (!checkIsAdmin()) {
+    alert("Access Denied: Only the primary admin can grant Star Coins!");
+    return;
+  }
+
+  if (!targetUid || !targetUid.trim()) {
+    alert("Invalid User UID provided.");
+    return;
+  }
+
+  if (isNaN(amount) || amount <= 0) {
+    alert("Please enter a valid coin amount.");
+    return;
+  }
+
+  const cleanUid = targetUid.trim();
+  const db = firebase.firestore();
+  const userRef = db.collection('users').doc(cleanUid);
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists) {
+        throw new Error("Target user profile not found in database!");
+      }
+
+      const currentCoins = userDoc.data().starCoins || 0;
+      transaction.update(userRef, {
+        starCoins: currentCoins + amount
+      });
+    });
+
+    alert(`👑 [GOD MODE] Successfully granted ${amount} Star Coins to user UID: ${cleanUid}!`);
+    
+    if (typeof currentSelectedUid !== 'undefined' && currentSelectedUid === cleanUid) {
+      openChannelProfile(cleanUid);
+    }
+  } catch (err) {
+    console.error("Failed to grant Star Coins:", err);
+    alert("Error: " + err.message);
+  }
+}
+
+// ==========================================
+// 🪙 STAR COIN & COMPANION PET ECONOMY
+// ==========================================
+async function addStarCoins(amount) {
+  const user = firebase.auth().currentUser;
+  if (!user) return;
+
+  const userRef = firebase.firestore().collection('users').doc(user.uid);
+  try {
+    await firebase.firestore().runTransaction(async (transaction) => {
+      const doc = await transaction.get(userRef);
+      if (!doc.exists) return;
+      const currentCoins = doc.data().starCoins || 0;
+      transaction.update(userRef, { starCoins: currentCoins + amount });
+    });
+    console.log(`Earned ${amount} Star Coins! ⭐`);
+  } catch (err) {
+    console.error("Failed to add coins:", err);
+  }
+}
+
+async function buyStreamPet(petName, cost) {
+  const user = firebase.auth().currentUser;
+  if (!user) {
+    alert("Please log in to adopt a pet!");
+    return;
+  }
+
+  const userRef = firebase.firestore().collection('users').doc(user.uid);
+  
+  try {
+    await firebase.firestore().runTransaction(async (transaction) => {
+      const doc = await transaction.get(userRef);
+      if (!doc.exists) throw "User profile not found!";
+
+      const data = doc.data();
+      const coins = data.starCoins || 0;
+      const owned = data.ownedPets || [];
+
+      if (owned.includes(petName)) {
+        throw new Error("You already own this pet!");
+      }
+
+      if (coins < cost) {
+        throw new Error(`Not enough Star Coins! You need ${cost} coins, but you only have ${coins}.`);
+      }
+
+      transaction.update(userRef, {
+        starCoins: coins - cost,
+        ownedPets: firebase.firestore.FieldValue.arrayUnion(petName),
+        equippedPet: petName
+      });
+    });
+
+    alert(`🎉 Success! You adopted ${petName} as your new companion pet!`);
+    
+    // Update live pet graphic instantly
+    updateActivePetDisplay(petName);
+    openChannelProfile(user.uid);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// ==========================================
+// 🐾 LIVING COMPANION PET AI ENGINE
+// ==========================================
+let petX = window.innerWidth - 100;
+let petY = window.innerHeight - 100;
+let targetX = petX;
+let targetY = petY;
+let petElement = null;
+
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    petElement = document.getElementById('living-pet-container');
+    startPetBehaviorLoop();
+  }, 1000);
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (Math.random() < 0.05) {
+    targetX = e.clientX + 40;
+    targetY = e.clientY + 40;
+  }
+});
+
+function updateActivePetDisplay(petName) {
+  const graphicEl = document.getElementById('pet-avatar-graphic');
+  if (!graphicEl) return;
+
+  if (petName.includes('Puppy')) graphicEl.innerText = '🐶';
+  else if (petName.includes('Cat')) graphicEl.innerText = '🐱';
+  else if (petName.includes('Dragon')) graphicEl.innerText = '🐲';
+  else graphicEl.innerText = '⭐';
+}
+
+function startPetBehaviorLoop() {
+  setInterval(() => {
+    if (!petElement) return;
+
+    petX += (targetX - petX) * 0.05;
+    petY += (targetY - petY) * 0.05;
+
+    petX = Math.max(20, Math.min(window.innerWidth - 80, petX));
+    petY = Math.max(20, Math.min(window.innerHeight - 80, petY));
+
+    petElement.style.left = `${petX}px`;
+    petElement.style.top = `${petY}px`;
+  }, 50);
+
+  setInterval(() => {
+    targetX = Math.random() * (window.innerWidth - 150) + 50;
+    targetY = Math.random() * (window.innerHeight - 150) + 50;
+    triggerRandomPetThought();
+  }, 12000);
+}
+
+function triggerRandomPetThought() {
+  const bubble = document.getElementById('pet-speech-bubble');
+  if (!bubble) return;
+
+  const thoughts = ["Feed me coins! 🪙", "Stream is looking awesome! ✨", "Zzz... Oh hi! 💤", "Let's code a game! 🎮", "Waggles tail 🐾"];
+  const randomThought = thoughts[Math.floor(Math.random() * thoughts.length)];
+
+  bubble.innerText = randomThought;
+  bubble.style.display = 'block';
+
+  setTimeout(() => {
+    bubble.style.display = 'none';
+  }, 4000);
+}
+
+function interactWithPet() {
+  const graphicEl = document.getElementById('pet-avatar-graphic');
+  const bubble = document.getElementById('pet-speech-bubble');
+  if (!graphicEl) return;
+
+  graphicEl.classList.add('pet-reacting');
+  setTimeout(() => graphicEl.classList.remove('pet-reacting'), 400);
+
+  if (bubble) {
+    bubble.innerText = "Yay! ❤️ +10 Coins!";
+    bubble.style.display = 'block';
+    setTimeout(() => bubble.style.display = 'none', 3000);
+  }
+
+  addStarCoins(10);
+}
+
+// ==========================================
 // 🎁 V5 PACKAGE & CODE REDEMPTION SYSTEM
 // ==========================================
 async function redeemKidPackageCode() {
@@ -177,7 +374,6 @@ async function redeemKidPackageCode() {
         redeemedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
 
-      // Handle Star Creator Package Perk
       if (codeData.packageId === 'star_creator_pack') {
         const badgeObject = {
           id: "star_creator",
@@ -193,7 +389,6 @@ async function redeemKidPackageCode() {
         }, { merge: true });
       }
       
-      // Handle Owner Verified Package Perk
       if (codeData.packageId === 'owner_verified_pack') {
         const badgeObject = {
           id: "owner_verified",
@@ -213,7 +408,6 @@ async function redeemKidPackageCode() {
     alert("🎉 SUCCESS! Package successfully redeemed and unlocked!");
     inputEl.value = '';
     
-    // Refresh user profile & active branding instantly
     loadAndApplyUserTheme(user.uid);
     openChannelProfile(user.uid);
   } catch (err) {
@@ -235,7 +429,6 @@ async function loadAndApplyUserTheme(uid) {
   const unlocked = data.unlockedPackages || [];
   const activeTheme = data.activeTheme || 'default';
 
-  // Enable unlocked package options in switcher dropdown
   const starOpt = document.getElementById('opt-star-creator');
   const ownerOpt = document.getElementById('opt-owner-verified');
 
@@ -261,7 +454,6 @@ function applyThemeBranding(themeKey) {
   const bodyEl = document.body;
   if (!logoContainer) return;
 
-  // Helper to update all cards and panels app-wide for Roblox custom themes
   const cards = document.querySelectorAll('.card-panel, .video-card, .chat-card, .auth-bar');
 
   switch (themeKey) {
@@ -274,7 +466,6 @@ function applyThemeBranding(themeKey) {
           </span>
         </div>
       `;
-      // Full App Theme: Crimson & Gold fire aesthetic
       root.style.setProperty('--bg-primary', '#120505');
       root.style.setProperty('--bg-card', '#220b0b');
       root.style.setProperty('--border-color', '#ff4444');
@@ -297,7 +488,6 @@ function applyThemeBranding(themeKey) {
           </span>
         </div>
       `;
-      // Full App Theme: Cyan & Electric Blue aesthetic
       root.style.setProperty('--bg-primary', '#041018');
       root.style.setProperty('--bg-card', '#0a1d29');
       root.style.setProperty('--border-color', '#00ffcc');
@@ -313,7 +503,6 @@ function applyThemeBranding(themeKey) {
 
     default:
       logoContainer.innerHTML = `<span style="color: #0088ff; font-weight: bold; font-size: 1.2rem;">StreamKids</span>`;
-      // Default Dark Theme
       root.style.setProperty('--bg-primary', '#121212');
       root.style.setProperty('--bg-card', '#1e1e1e');
       root.style.setProperty('--border-color', '#333333');
@@ -646,7 +835,6 @@ function loadVideoComments(videoId) {
         const commentEl = document.createElement('div');
         commentEl.style.cssText = "margin-bottom: 6px; font-size: 0.85rem; background: #111; padding: 6px 10px; border-radius: 6px;";
         commentEl.innerHTML = `<strong style="color: #0088ff;">@${author}:</strong> <span style="color: #ddd;">${text}</span>`;
-        commentEl.style.background = 'var(--bg-card, #111)';
         container.appendChild(commentEl);
       });
     }, (err) => {
@@ -991,3 +1179,8 @@ window.switchUserActiveTheme = switchUserActiveTheme;
 window.loadAndApplyUserTheme = loadAndApplyUserTheme;
 window.grantVerificationWithRules = grantVerificationWithRules;
 window.grantOwnerVerifiedPackage = grantOwnerVerifiedPackage;
+window.adminGrantStarCoins = adminGrantStarCoins;
+window.addStarCoins = addStarCoins;
+window.buyStreamPet = buyStreamPet;
+window.interactWithPet = interactWithPet;
+window.updateActivePetDisplay = updateActivePetDisplay;
