@@ -23,11 +23,80 @@ function logoutUser() {
 }
 
 // ==========================================
-// 👑 V4.9.9 GOD MODE ADMIN HELPER
+// 👑 V5 GOD MODE & ADMIN PERMISSIONS
 // ==========================================
 function checkIsAdmin() {
   const user = firebase.auth().currentUser;
   return user && user.email === "skibidiw63@gmail.com";
+}
+
+// Admin / Owner Verified function to grant verification with rules (500 subs or 100 subs for Star Creators)
+async function grantVerificationWithRules(targetUid) {
+  const currentUser = firebase.auth().currentUser;
+  if (!currentUser) return;
+
+  const db = firebase.firestore();
+  const actingUserDoc = await db.collection('users').doc(currentUser.uid).get();
+  
+  const isAdmin = checkIsAdmin();
+  const isOwnerVerified = actingUserDoc.exists && actingUserDoc.data().isOwnerVerified;
+
+  if (!isAdmin && !isOwnerVerified) {
+    alert("Access Denied: You must be Owner Verified or Admin to verify users!");
+    return;
+  }
+
+  const targetDoc = await db.collection('users').doc(targetUid).get();
+  if (!targetDoc.exists) {
+    alert("Target user profile not found!");
+    return;
+  }
+
+  const targetData = targetDoc.data();
+  const subCount = targetData.subscribersCount || 0;
+  const isStarCreator = targetData.isStarCreator || false;
+
+  // Verification Rules: 500 subs normally, or 100 subs if Star Creator
+  const requiredSubs = isStarCreator ? 100 : 500;
+
+  if (!isAdmin && subCount < requiredSubs) {
+    alert(`Cannot verify user!\nThey have ${subCount} subscribers.\nRequired threshold: ${requiredSubs} subs ${isStarCreator ? '(Star Creator rule)' : '(Standard rule)'}.`);
+    return;
+  }
+
+  try {
+    await db.collection('users').doc(targetUid).set({
+      isVerified: true
+    }, { merge: true });
+
+    alert(`Success! Granted Verified badge to @${targetData.displayName || 'Creator'}!`);
+  } catch (err) {
+    console.error("Failed to grant verification:", err);
+    alert("Error: " + err.message);
+  }
+}
+
+// Grant Owner Verified Package (Primary Admin Only)
+async function grantOwnerVerifiedPackage(targetUid) {
+  if (!checkIsAdmin()) {
+    alert("Only the primary administrator can grant Owner Verified!");
+    return;
+  }
+
+  const badgeObj = {
+    id: "owner_verified",
+    title: "Owner Verified",
+    icon: "🔨",
+    unlockedAt: new Date().toISOString()
+  };
+
+  await firebase.firestore().collection('users').doc(targetUid).set({
+    isOwnerVerified: true,
+    unlockedPackages: firebase.firestore.FieldValue.arrayUnion("owner_verified"),
+    badges: firebase.firestore.FieldValue.arrayUnion(badgeObj)
+  }, { merge: true });
+
+  alert("🔨 Owner Verified package successfully granted!");
 }
 
 // Admin function to force-update subscriber counts, views, or likes
@@ -49,13 +118,177 @@ async function adminOverrideStats(targetId, collectionName, fieldName, newValue)
   }
 }
 
+// ==========================================
+// 🎁 V5 PACKAGE & CODE REDEMPTION SYSTEM
+// ==========================================
+async function redeemKidPackageCode() {
+  const user = firebase.auth().currentUser;
+  if (!user) {
+    alert("Please log in to redeem a code!");
+    return;
+  }
+
+  const inputEl = document.getElementById('redeem-code-input');
+  if (!inputEl || !inputEl.value.trim()) {
+    alert("Please enter a valid code!");
+    return;
+  }
+
+  const codeInput = inputEl.value.trim().toUpperCase();
+  const db = firebase.firestore();
+  const codeRef = db.collection('redeemCodes').doc(codeInput);
+  const userRef = db.collection('users').doc(user.uid);
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const codeDoc = await transaction.get(codeRef);
+      if (!codeDoc.exists) {
+        throw new Error("Invalid code! Please check with your parents or try again.");
+      }
+
+      const codeData = codeDoc.data();
+      if (codeData.used) {
+        throw new Error("This code has already been redeemed!");
+      }
+
+      transaction.update(codeRef, {
+        used: true,
+        redeemedBy: user.uid,
+        redeemedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Handle Star Creator Package Perk
+      if (codeData.packageId === 'star_creator_pack') {
+        const badgeObject = {
+          id: "star_creator",
+          title: "Star Creator",
+          icon: "⭐",
+          unlockedAt: new Date().toISOString()
+        };
+
+        transaction.set(userRef, {
+          isStarCreator: true,
+          unlockedPackages: firebase.firestore.FieldValue.arrayUnion("star_creator"),
+          badges: firebase.firestore.FieldValue.arrayUnion(badgeObject)
+        }, { merge: true });
+      }
+      
+      // Handle Owner Verified Package Perk
+      if (codeData.packageId === 'owner_verified_pack') {
+        const badgeObject = {
+          id: "owner_verified",
+          title: "Owner Verified",
+          icon: "🔨",
+          unlockedAt: new Date().toISOString()
+        };
+
+        transaction.set(userRef, {
+          isOwnerVerified: true,
+          unlockedPackages: firebase.firestore.FieldValue.arrayUnion("owner_verified"),
+          badges: firebase.firestore.FieldValue.arrayUnion(badgeObject)
+        }, { merge: true });
+      }
+    });
+
+    alert("🎉 SUCCESS! Package successfully redeemed and unlocked!");
+    inputEl.value = '';
+    
+    // Refresh user profile & active branding
+    loadAndApplyUserTheme(user.uid);
+  } catch (err) {
+    console.error("Redemption failed:", err);
+    alert(err.message);
+  }
+}
+
+// ==========================================
+// 🎨 THEME & PACKAGE SWITCHER
+// ==========================================
+async function loadAndApplyUserTheme(uid) {
+  const db = firebase.firestore();
+  const userDoc = await db.collection('users').doc(uid).get();
+  
+  if (!userDoc.exists) return;
+
+  const data = userDoc.data();
+  const unlocked = data.unlockedPackages || [];
+  const activeTheme = data.activeTheme || 'default';
+
+  // Enable unlocked package options in switcher dropdown
+  const starOpt = document.getElementById('opt-star-creator');
+  const ownerOpt = document.getElementById('opt-owner-verified');
+
+  if (starOpt && (data.isStarCreator || unlocked.includes('star_creator'))) {
+    starOpt.disabled = false;
+    starOpt.innerText = "⭐ Star Creator Package (Unlocked)";
+  }
+
+  if (ownerOpt && (data.isOwnerVerified || unlocked.includes('owner_verified'))) {
+    ownerOpt.disabled = false;
+    ownerOpt.innerText = "🔨 Owner Verified Package (Unlocked)";
+  }
+
+  const selectEl = document.getElementById('theme-package-select');
+  if (selectEl) selectEl.value = activeTheme;
+
+  applyThemeBranding(activeTheme);
+}
+
+function applyThemeBranding(themeKey) {
+  const logoContainer = document.getElementById('app-logo-title');
+  if (!logoContainer) return;
+
+  switch (themeKey) {
+    case 'owner_verified':
+      logoContainer.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: #0088ff; font-weight: bold; font-size: 1.2rem;">StreamKids</span>
+          <span style="background: linear-gradient(90deg, #ff0000, #ff8800); color: #fff; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; font-weight: bold; letter-spacing: 0.5px;">
+            🔨 OWNER VERIFIED
+          </span>
+        </div>
+      `;
+      break;
+
+    case 'star_creator':
+      logoContainer.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: #0088ff; font-weight: bold; font-size: 1.2rem;">StreamKids</span>
+          <span style="background: linear-gradient(90deg, #ff007f, #7928ca); color: #fff; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; font-weight: bold; letter-spacing: 0.5px;">
+            ⭐ STAR CREATOR
+          </span>
+        </div>
+      `;
+      break;
+
+    default:
+      logoContainer.innerHTML = `<span style="color: #0088ff; font-weight: bold; font-size: 1.2rem;">StreamKids</span>`;
+      break;
+  }
+}
+
+async function switchUserActiveTheme(selectedTheme) {
+  const currentUser = firebase.auth().currentUser;
+  if (!currentUser) return;
+
+  try {
+    await firebase.firestore().collection('users').doc(currentUser.uid).set({
+      activeTheme: selectedTheme
+    }, { merge: true });
+
+    applyThemeBranding(selectedTheme);
+    alert("Theme & Package style updated!");
+  } catch (err) {
+    console.error("Failed to switch theme:", err);
+  }
+}
+
 // Automated Direct YouTube Resumable Upload
 async function uploadKidVideo(file, title, description, category = 'gaming') {
   const uploadStatus = document.getElementById('upload-status');
   if (uploadStatus) uploadStatus.innerText = 'Initializing upload session...';
 
   try {
-    // 1. Get Direct YouTube Upload URL from Render
     const urlResponse = await fetch('https://streamkids-upload-service.onrender.com/get-upload-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -74,9 +307,7 @@ async function uploadKidVideo(file, title, description, category = 'gaming') {
 
     if (uploadStatus) uploadStatus.innerText = 'Uploading directly to YouTube: 0%...';
 
-    // 2. Stream video file directly to YouTube's server
     const xhr = new XMLHttpRequest();
-
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && uploadStatus) {
         const percent = Math.round((event.loaded / event.total) * 100);
@@ -85,7 +316,6 @@ async function uploadKidVideo(file, title, description, category = 'gaming') {
     };
 
     let responseText = null;
-
     await new Promise((resolve) => {
       xhr.open('PUT', urlData.uploadUrl, true);
       xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
@@ -100,8 +330,6 @@ async function uploadKidVideo(file, title, description, category = 'gaming') {
     if (uploadStatus) uploadStatus.innerText = 'Verifying YouTube Video ID...';
 
     let realVideoId = null;
-
-    // Try parsing raw response if browser captured it
     if (responseText) {
       try {
         const parsed = JSON.parse(responseText);
@@ -109,7 +337,6 @@ async function uploadKidVideo(file, title, description, category = 'gaming') {
       } catch (e) {}
     }
 
-    // Try server verification if endpoint exists
     if (!realVideoId) {
       try {
         const verifyResponse = await fetch('https://streamkids-upload-service.onrender.com/verify-upload', {
@@ -134,8 +361,18 @@ async function uploadKidVideo(file, title, description, category = 'gaming') {
     if (uploadStatus) uploadStatus.innerText = 'Saving to StreamKids database...';
 
     const currentUser = firebase.auth().currentUser;
+    
+    // Check if uploader is Star Creator or Owner Verified to attach badge flags
+    let isStarUploader = false;
+    let isOwnerUploader = false;
+    if (currentUser) {
+      const userDoc = await firebase.firestore().collection('users').doc(currentUser.uid).get();
+      if (userDoc.exists) {
+        isStarUploader = userDoc.data().isStarCreator || false;
+        isOwnerUploader = userDoc.data().isOwnerVerified || false;
+      }
+    }
 
-    // 3. Save Video ID, Category & Engagement Stats to Firestore
     await firebase.firestore().collection('videos').add({
       title: title || 'StreamKids Video',
       description: description || 'Uploaded on StreamKids',
@@ -144,6 +381,8 @@ async function uploadKidVideo(file, title, description, category = 'gaming') {
       visibility: 'public',
       uploaderUid: currentUser ? currentUser.uid : 'guest',
       uploaderName: currentUser ? currentUser.displayName : 'Guest Creator',
+      isStarCreator: isStarUploader,
+      isOwnerVerified: isOwnerUploader,
       likesCount: 0,
       viewsCount: 0,
       likedBy: [],
@@ -153,7 +392,6 @@ async function uploadKidVideo(file, title, description, category = 'gaming') {
     if (uploadStatus) uploadStatus.innerText = 'Upload successful!';
     alert('Your video is live on StreamKids!');
 
-    // Reset upload form cleanly
     const form = document.getElementById('upload-form');
     if (form && typeof form.reset === 'function') {
       form.reset();
@@ -169,10 +407,9 @@ async function uploadKidVideo(file, title, description, category = 'gaming') {
   }
 }
 
-// Global variable to store fetched FYP videos for instant filtering
+// Global variable to store fetched FYP videos
 let allFYPVideos = [];
 
-// Loads and renders videos with YouTube Thumbnail -> Player Switcher, Likes, Comments & Share
 async function loadFYP() {
   const fypContainer = document.getElementById('fyp-container');
   if (!fypContainer) return;
@@ -204,7 +441,6 @@ async function loadFYP() {
   }
 }
 
-// Render filtered video list with search query & category
 function renderFYPList(videos) {
   const fypContainer = document.getElementById('fyp-container');
   if (!fypContainer) return;
@@ -219,7 +455,6 @@ function renderFYPList(videos) {
     const title = (v.title || '').toLowerCase();
     const uploader = (v.uploaderName || '').toLowerCase();
     const matchesSearch = !searchQuery || title.includes(searchQuery) || uploader.includes(searchQuery);
-    
     const matchesCategory = selectedCategory === 'all' || v.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -233,11 +468,12 @@ function renderFYPList(videos) {
   filtered.forEach(data => {
     const videoId = data.id;
     const ytId = data.youtubeVideoId;
-    const authorName = data.uploaderName || data.userName || 'Guest User';
-    const uploaderUid = data.uploaderUid || data.userId || data.uid || data.authorId || '';
+    const authorName = data.uploaderName || 'Guest User';
+    const uploaderUid = data.uploaderUid || '';
     const likesCount = data.likesCount || 0;
+    const isStarUploader = data.isStarCreator || false;
+    const isOwnerUploader = data.isOwnerVerified || false;
 
-    // High-res YouTube thumbnail URL with fallback
     const thumbUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
 
     const card = document.createElement('div');
@@ -249,11 +485,12 @@ function renderFYPList(videos) {
 
     card.innerHTML = `
       <h3 style="color: #00ffcc; margin-bottom: 4px;">${escapeHtml(data.title || 'Untitled')}</h3>
-      <p style="color: #aaaaaa; font-size: 0.9rem; margin-bottom: 10px;">
+      <p style="color: #aaaaaa; font-size: 0.9rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
         Posted by <span onclick="event.stopPropagation(); openChannelProfile('${uploaderUid}')" style="color: #0088ff; cursor: pointer; font-weight: bold;">@${escapeHtml(authorName)}</span>
+        ${isOwnerUploader ? `<span style="background: linear-gradient(90deg, #ff0000, #ff8800); color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px;">🔨 OWNER VERIFIED</span>` : ''}
+        ${isStarUploader && !isOwnerUploader ? `<span style="background: linear-gradient(90deg, #ff007f, #0088ff); color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px;">⭐ STAR CREATOR</span>` : ''}
       </p>
       
-      <!-- YouTube Thumbnail Container (Swaps to Player on Click) -->
       <div id="media-container-${videoId}" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; background: #000; cursor: pointer;" onclick="playThumbnailVideo('${videoId}', '${ytId}')" title="Click to play video">
         <img src="${thumbUrl}" alt="Video Thumbnail" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://via.placeholder.com/480x360?text=StreamKids+Video'" />
         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border-radius: 50%; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; border: 2px solid #fff;">
@@ -263,7 +500,6 @@ function renderFYPList(videos) {
 
       ${data.description ? `<p style="margin-top: 8px; color: #dddddd;">${escapeHtml(data.description)}</p>` : ''}
 
-      <!-- Engagement Bar (Likes, Comments & Share) -->
       <div style="display: flex; gap: 10px; margin-top: 12px; align-items: center; flex-wrap: wrap;">
         <button onclick="handleLikeVideo('${videoId}')" class="btn btn-gray" style="padding: 6px 12px; border-radius: 16px; font-size: 0.85rem; cursor: pointer;">
           👍 <span id="like-count-${videoId}">${likesCount}</span> Likes
@@ -281,7 +517,6 @@ function renderFYPList(videos) {
         ` : ''}
       </div>
 
-      <!-- Collapsible Comment Box -->
       <div id="comments-box-${videoId}" style="display: none; margin-top: 12px; background: #121212; padding: 10px; border-radius: 8px; border: 1px solid #222;">
         <div id="comments-list-${videoId}" style="max-height: 180px; overflow-y: auto; margin-bottom: 8px;">
           <p style="color: #888; font-size: 0.85rem;">Loading comments...</p>
@@ -301,7 +536,6 @@ function filterFYPFeed() {
   renderFYPList(allFYPVideos);
 }
 
-// Swap Thumbnail for Live Embedded YouTube Player on Click
 function playThumbnailVideo(videoId, ytId) {
   const container = document.getElementById(`media-container-${videoId}`);
   if (!container) return;
@@ -318,7 +552,6 @@ function playThumbnailVideo(videoId, ytId) {
   `;
 }
 
-// Toggle Comments Box Visibility
 function toggleComments(videoId) {
   const commentBox = document.getElementById(`comments-box-${videoId}`);
   if (!commentBox) return;
@@ -331,7 +564,6 @@ function toggleComments(videoId) {
   }
 }
 
-// Load Video Comments from Firestore
 function loadVideoComments(videoId) {
   const container = document.getElementById(`comments-list-${videoId}`);
   if (!container) return;
@@ -360,7 +592,6 @@ function loadVideoComments(videoId) {
     });
 }
 
-// Post a New Comment
 async function postComment(videoId) {
   const user = firebase.auth().currentUser;
   if (!user) {
@@ -382,16 +613,13 @@ async function postComment(videoId) {
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    input.value = ''; // Clear input
+    input.value = '';
   } catch (err) {
     console.error("Failed to post comment:", err);
     alert("Failed to post comment: " + err.message);
   }
 }
 
-// ==========================================
-// 💖 V4.9.9 LIKES & SHARE HANDLERS
-// ==========================================
 async function handleLikeVideo(videoId) {
   const user = firebase.auth().currentUser;
   if (!user) {
@@ -413,11 +641,9 @@ async function handleLikeVideo(videoId) {
       let newLikesCount = data.likesCount || 0;
 
       if (userIndex > -1) {
-        // Unlike
         likedBy.splice(userIndex, 1);
         newLikesCount = Math.max(0, newLikesCount - 1);
       } else {
-        // Like
         likedBy.push(user.uid);
         newLikesCount += 1;
       }
@@ -445,9 +671,7 @@ async function shareVideo(youtubeVideoId) {
   }
 }
 
-// ==========================================
-// 🎨 CHANNEL BUILDER & STUDIO (Owner Tools)
-// ==========================================
+// Channel Studio & Profile Management
 function triggerAvatarChange() {
   const choice = prompt("Type '1' to enter an Image URL link, or '2' to upload an image file from your device:", "1");
   if (choice === "1") {
@@ -467,7 +691,6 @@ async function changeProfilePictureUrl() {
 
   try {
     const cleanUrl = newUrl.trim();
-
     await firebase.firestore().collection('users').doc(currentUser.uid).set({
       avatarUrl: cleanUrl,
       photoURL: cleanUrl
@@ -496,8 +719,6 @@ async function uploadProfilePictureFile(event, uid) {
     const reader = new FileReader();
     reader.onload = async (e) => {
       const base64Img = e.target.result;
-
-      // Save directly to Firestore (Auth updateProfile removed to fix length error)
       await firebase.firestore().collection('users').doc(uid).set({
         avatarUrl: base64Img,
         photoURL: base64Img
@@ -527,7 +748,6 @@ async function editChannelName() {
 
   try {
     const cleanName = newName.trim();
-
     await firebase.firestore().collection('users').doc(currentUser.uid).set({
       displayName: cleanName
     }, { merge: true });
@@ -545,7 +765,6 @@ async function editChannelName() {
   }
 }
 
-// Edit Bio & Social Link
 async function editChannelBio() {
   const currentUser = firebase.auth().currentUser;
   if (!currentUser) return;
@@ -577,7 +796,6 @@ async function editChannelBio() {
   }
 }
 
-// Change Banner Image URL
 async function triggerBannerChange() {
   const currentUser = firebase.auth().currentUser;
   if (!currentUser) return;
@@ -603,9 +821,6 @@ async function triggerBannerChange() {
   }
 }
 
-// ==========================================
-// 👥 REAL-TIME SUBSCRIPTION TRANSACTION
-// ==========================================
 async function toggleSubscribe(targetUid) {
   const currentUser = firebase.auth().currentUser;
   if (!currentUser) {
@@ -669,7 +884,6 @@ async function toggleSubscribe(targetUid) {
   }
 }
 
-// Helper to escape special HTML characters to prevent XSS issues
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -678,7 +892,6 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// File Selection Handler
 function handleFileSelect(event) {
   const file = event.target.files[0];
   const form = document.getElementById('upload-form');
@@ -711,3 +924,8 @@ window.handleFileSelect = handleFileSelect;
 window.handleLikeVideo = handleLikeVideo;
 window.shareVideo = shareVideo;
 window.adminOverrideStats = adminOverrideStats;
+window.redeemKidPackageCode = redeemKidPackageCode;
+window.switchUserActiveTheme = switchUserActiveTheme;
+window.loadAndApplyUserTheme = loadAndApplyUserTheme;
+window.grantVerificationWithRules = grantVerificationWithRules;
+window.grantOwnerVerifiedPackage = grantOwnerVerifiedPackage;
