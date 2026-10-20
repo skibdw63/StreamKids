@@ -257,37 +257,74 @@ async function loadAndApplyUserTheme(uid) {
 
 function applyThemeBranding(themeKey) {
   const logoContainer = document.getElementById('app-logo-title');
+  const root = document.documentElement;
   const bodyEl = document.body;
   if (!logoContainer) return;
+
+  // Helper to update all cards and panels app-wide for Roblox custom themes
+  const cards = document.querySelectorAll('.card-panel, .video-card, .chat-card, .auth-bar');
 
   switch (themeKey) {
     case 'owner_verified':
       logoContainer.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="color: #ff4444; font-weight: bold; font-size: 1.2rem;">StreamKids</span>
+          <span style="color: #ff4444; font-weight: bold; font-size: 1.2rem; text-shadow: 0 0 10px rgba(255,0,0,0.6);">StreamKids</span>
           <span style="background: linear-gradient(90deg, #ff0000, #ff8800); color: #fff; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; font-weight: bold; letter-spacing: 0.5px; box-shadow: 0 0 10px rgba(255,0,0,0.5);">
             🔨 OWNER VERIFIED
           </span>
         </div>
       `;
-      if (bodyEl) bodyEl.style.borderTop = "4px solid #ff4444";
+      // Full App Theme: Crimson & Gold fire aesthetic
+      root.style.setProperty('--bg-primary', '#120505');
+      root.style.setProperty('--bg-card', '#220b0b');
+      root.style.setProperty('--border-color', '#ff4444');
+      if (bodyEl) {
+        bodyEl.style.backgroundColor = '#120505';
+        bodyEl.style.borderTop = "4px solid #ff0000";
+      }
+      cards.forEach(card => {
+        card.style.background = '#220b0b';
+        card.style.borderColor = '#ff4444';
+      });
       break;
 
     case 'star_creator':
       logoContainer.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="color: #00ffcc; font-weight: bold; font-size: 1.2rem; text-shadow: 0 0 8px rgba(0,255,204,0.4);">StreamKids</span>
+          <span style="color: #00ffcc; font-weight: bold; font-size: 1.2rem; text-shadow: 0 0 10px rgba(0,255,204,0.4);">StreamKids</span>
           <span style="background: linear-gradient(90deg, #0088ff, #00ffcc); color: #000; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; font-weight: bold; letter-spacing: 0.5px; box-shadow: 0 0 10px rgba(0,255,204,0.4);">
             ⭐ STAR CREATOR
           </span>
         </div>
       `;
-      if (bodyEl) bodyEl.style.borderTop = "4px solid #00ffcc";
+      // Full App Theme: Cyan & Electric Blue aesthetic
+      root.style.setProperty('--bg-primary', '#041018');
+      root.style.setProperty('--bg-card', '#0a1d29');
+      root.style.setProperty('--border-color', '#00ffcc');
+      if (bodyEl) {
+        bodyEl.style.backgroundColor = '#041018';
+        bodyEl.style.borderTop = "4px solid #00ffcc";
+      }
+      cards.forEach(card => {
+        card.style.background = '#0a1d29';
+        card.style.borderColor = '#00ffcc';
+      });
       break;
 
     default:
       logoContainer.innerHTML = `<span style="color: #0088ff; font-weight: bold; font-size: 1.2rem;">StreamKids</span>`;
-      if (bodyEl) bodyEl.style.borderTop = "none";
+      // Default Dark Theme
+      root.style.setProperty('--bg-primary', '#121212');
+      root.style.setProperty('--bg-card', '#1e1e1e');
+      root.style.setProperty('--border-color', '#333333');
+      if (bodyEl) {
+        bodyEl.style.backgroundColor = '#121212';
+        bodyEl.style.borderTop = "none";
+      }
+      cards.forEach(card => {
+        card.style.background = '#1e1e1e';
+        card.style.borderColor = '#333333';
+      });
       break;
   }
 }
@@ -503,7 +540,7 @@ function renderFYPList(videos) {
     const card = document.createElement('div');
     card.className = 'video-card';
     card.style.marginBottom = '24px';
-    card.style.background = '#181818';
+    card.style.background = 'var(--bg-card, #181818)';
     card.style.padding = '14px';
     card.style.borderRadius = '10px';
 
@@ -609,6 +646,7 @@ function loadVideoComments(videoId) {
         const commentEl = document.createElement('div');
         commentEl.style.cssText = "margin-bottom: 6px; font-size: 0.85rem; background: #111; padding: 6px 10px; border-radius: 6px;";
         commentEl.innerHTML = `<strong style="color: #0088ff;">@${author}:</strong> <span style="color: #ddd;">${text}</span>`;
+        commentEl.style.background = 'var(--bg-card, #111)';
         container.appendChild(commentEl);
       });
     }, (err) => {
