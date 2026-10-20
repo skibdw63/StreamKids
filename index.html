@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StreamKids</title>
+  <title>StreamKids V5</title>
   <link rel="manifest" href="manifest.json">
 
   <!-- Firebase Compatibility SDKs -->
@@ -328,6 +328,8 @@
       border: 1px solid #333333;
       padding: 0;
       overflow: hidden;
+      max-height: 90vh;
+      overflow-y: auto;
     }
 
     .close-btn {
@@ -408,7 +410,6 @@
         return;
       }
 
-      // Calls the Render + YouTube Backend Upload function with category included
       uploadKidVideo(fileInput.files[0], titleInput, descInput, category);
     }
 
@@ -445,7 +446,7 @@
         .then(() => console.log("System crash triggered globally."))
         .catch((err) => alert("Error triggering crash: " + err.message));
       } else {
-        alert("Unauthorized! Only skibidiw63@gmail.com can trigger this action.");
+        alert("Unauthorized!");
       }
     }
 
@@ -482,6 +483,8 @@
       const ownerStudio = document.getElementById('owner-studio-controls');
       const adminControls = document.getElementById('admin-verify-controls');
       const toggleBtn = document.getElementById('toggle-verify-btn');
+      const redemptionBox = document.getElementById('package-redemption-box');
+      const themeSwitcherBox = document.getElementById('theme-switcher-box');
 
       const currentUser = firebase.auth().currentUser;
       const isAdmin = currentUser && currentUser.email && currentUser.email.toLowerCase() === ADMIN_EMAIL;
@@ -509,17 +512,20 @@
           currentSelectedUserVerified = !!data.isVerified;
           badgeEl.style.display = currentSelectedUserVerified ? 'inline' : 'none';
 
-          // Show/Hide Owner vs Viewer Controls
           if (isSelf) {
             if (subBtnContainer) subBtnContainer.style.display = 'none';
             if (ownerAvatarBtn) ownerAvatarBtn.style.display = 'flex';
             if (ownerStudio) ownerStudio.style.display = 'block';
+            if (redemptionBox) redemptionBox.style.display = 'block';
+            if (themeSwitcherBox) themeSwitcherBox.style.display = 'block';
+            loadAndApplyUserTheme(uid);
           } else {
             if (subBtnContainer) subBtnContainer.style.display = 'block';
             if (ownerAvatarBtn) ownerAvatarBtn.style.display = 'none';
             if (ownerStudio) ownerStudio.style.display = 'none';
+            if (redemptionBox) redemptionBox.style.display = 'none';
+            if (themeSwitcherBox) themeSwitcherBox.style.display = 'none';
 
-            // Check if current user is subscribed
             let isSubscribed = false;
             if (currentUser) {
               const myDoc = await firebase.firestore().collection('users').doc(currentUser.uid).get();
@@ -535,9 +541,9 @@
             }
           }
 
-          if (isAdmin) {
+          if (isAdmin || data.isOwnerVerified) {
             adminControls.style.display = 'block';
-            toggleBtn.innerText = currentSelectedUserVerified ? 'Revoke Verified Badge' : 'Grant Verified Badge';
+            toggleBtn.innerText = currentSelectedUserVerified ? 'Revoke Verified Badge' : 'Grant Verified Badge (Rule check)';
             toggleBtn.className = currentSelectedUserVerified ? 'btn btn-red' : 'btn btn-blue';
           } else {
             adminControls.style.display = 'none';
@@ -556,28 +562,9 @@
     }
 
     function toggleUserVerification() {
-      const currentUser = firebase.auth().currentUser;
-      if (!currentUser || currentUser.email.toLowerCase() !== ADMIN_EMAIL) {
-        alert("Unauthorized! Only skibidiw63@gmail.com can verify channels.");
-        return;
-      }
-
       if (!currentSelectedUid) return;
-
-      const newStatus = !currentSelectedUserVerified;
-
-      firebase.firestore().collection('users').doc(currentSelectedUid).update({
-        isVerified: newStatus
-      }).then(() => {
-        currentSelectedUserVerified = newStatus;
-        document.getElementById('profile-modal-badge').style.display = newStatus ? 'inline' : 'none';
-        
-        const toggleBtn = document.getElementById('toggle-verify-btn');
-        toggleBtn.innerText = newStatus ? 'Revoke Verified Badge' : 'Grant Verified Badge';
-        toggleBtn.className = newStatus ? 'btn btn-red' : 'btn btn-blue';
-      }).catch(err => {
-        alert("Error updating badge: " + err.message);
-      });
+      // Uses the V5 rule-enforced verification handler from app-ui.js
+      grantVerificationWithRules(currentSelectedUid);
     }
 
     function openMyProfile() {
@@ -654,13 +641,20 @@
                 bio: 'Welcome to my official StreamKids channel!',
                 socialLink: '',
                 isVerified: isAdmin,
+                isOwnerVerified: isAdmin,
                 subscribersCount: 0,
-                subscriptions: []
+                subscriptions: [],
+                unlockedPackages: isAdmin ? ['owner_verified'] : [],
+                activeTheme: 'default'
               });
             } else {
               const data = doc.data();
               if (userAvatar && (data.photoURL || data.avatarUrl)) {
                 userAvatar.src = data.avatarUrl || data.photoURL;
+              }
+              // Apply active user theme/branding on load
+              if (typeof loadAndApplyUserTheme === 'function') {
+                loadAndApplyUserTheme(user.uid);
               }
             }
           });
@@ -685,7 +679,7 @@
 
   <!-- Top Auth Header Bar -->
   <div class="auth-bar">
-    <div class="brand-title">StreamKids</div>
+    <div id="app-logo-title" class="brand-title">StreamKids</div>
     <div>
       <button id="login-btn" onclick="loginWithGoogle()" class="btn btn-blue">Sign in with Google</button>
       <div id="user-info" class="user-profile-info" style="display: none;">
@@ -707,13 +701,14 @@
     <button id="crash-btn" onclick="triggerAdminCrash()" class="btn btn-red" style="display: none; margin-left: 8px;">Simulate Crash</button>
   </nav>
 
-  <!-- 👑 Global Admin God Mode Studio Panel (Visible only to skibidiw63@gmail.com) -->
+  <!-- 👑 Global Admin God Mode Studio Panel -->
   <div id="global-admin-panel" class="card-panel" style="display: none; border: 2px dashed #ffd700; background: #1a1800;">
-    <h2 style="color: #ffd700; display: flex; align-items: center; gap: 8px;">👑 StreamKids V4.9.9 Global God Mode Studio</h2>
+    <h2 style="color: #ffd700; display: flex; align-items: center; gap: 8px;">👑 StreamKids V5 Global God Mode Studio</h2>
     <p style="color: #ccc; margin-bottom: 12px; font-size: 0.9rem;">Global overrides apply instantly across all connected user sessions worldwide.</p>
     <div class="controls-bar">
       <button onclick="adminOverrideStats(prompt('Enter Video ID or Document ID:'), 'videos', 'likesCount', prompt('Set New Global Like Count:'))" class="btn btn-gold">Global Override Likes</button>
       <button onclick="adminOverrideStats(prompt('Enter User UID:'), 'users', 'subscribersCount', prompt('Set New Global Subscriber Count:'))" class="btn btn-gold">Global Override Subscribers</button>
+      <button onclick="grantOwnerVerifiedPackage(prompt('Enter User UID to grant Owner Verified package:'))" class="btn btn-gold">Grant Owner Verified Package</button>
     </div>
   </div>
 
@@ -728,7 +723,6 @@
 
         <span class="divider">|</span>
 
-        <!-- Search & Watch Controls -->
         <input type="text" id="search-stream-input" placeholder="Enter Stream Title or Streamer..." class="dark-input" aria-label="Search Stream">
         <button id="watch-stream-btn" onclick="searchAndWatchStream()" class="btn btn-blue">Watch Stream</button>
 
@@ -744,7 +738,6 @@
       <span>👁️ Live Viewers: <strong id="viewer-count" class="green-text">0</strong></span>
     </div>
 
-    <!-- Two-Column Layout -->
     <div class="dashboard-grid">
       <div class="video-column">
         <div class="video-card">
@@ -787,7 +780,6 @@
         <input type="text" id="video-title-input" placeholder="Video Title" class="dark-input full-width" aria-label="Video Title"><br><br>
         <textarea id="video-desc-input" placeholder="Description..." class="dark-input full-width" style="height: 80px;" aria-label="Video Description"></textarea><br><br>
 
-        <!-- 🔍 Category Selection -->
         <div style="margin-bottom: 15px;">
           <label style="font-size: 0.9rem; color: #aaa; display: block; margin-bottom: 5px;">Category:</label>
           <select id="video-category-select" class="dark-input full-width">
@@ -814,7 +806,6 @@
     <div class="card-panel">
       <h2>For You Feed</h2>
       
-      <!-- 🔍 Search & Category Filter Bar -->
       <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
         <input type="text" id="fyp-search-input" placeholder="Search videos by title or creator..." class="dark-input" style="flex: 1; min-width: 220px;" oninput="filterFYPFeed()">
         
@@ -849,11 +840,9 @@
     <div class="modal-content">
       <button class="close-btn" onclick="closeProfileModal()">✕</button>
       
-      <!-- 🖼️ Channel Banner Header -->
       <div id="profile-modal-banner" style="width: 100%; height: 110px; background: #333; background-size: cover; background-position: center; position: relative;"></div>
 
       <div style="padding: 0 25px 25px 25px; position: relative;">
-        <!-- Avatar overlapping banner with Owner Camera Overlay Button -->
         <div style="position: relative; display: inline-block; margin-top: -45px;">
           <img id="profile-modal-avatar" class="profile-avatar-lg" src="https://via.placeholder.com/80" alt="Avatar">
           <input type="file" id="modal-avatar-file-input" accept="image/*" style="display: none;" onchange="uploadProfilePictureFile(event, currentSelectedUid)">
@@ -868,23 +857,40 @@
         </h2>
         <p id="profile-modal-email" style="color: #888; font-size: 0.85rem; margin-top: 2px;"></p>
 
-        <!-- 📝 Bio & Social Links -->
         <p id="profile-modal-bio" style="color: #ddd; font-size: 0.9rem; margin: 8px 0; font-style: italic;"></p>
         <p id="profile-modal-social" style="color: #0088ff; font-size: 0.85rem; margin-bottom: 8px;"></p>
 
-        <!-- 👥 Subscriber Count Display -->
         <p style="color: #00ffcc; font-size: 1rem; font-weight: bold; margin: 10px 0;">
           👥 <span id="profile-modal-subs">0</span> Subscribers
         </p>
 
-        <!-- 🔴 Subscribe Button -->
         <div id="modal-subscribe-container" style="margin-top: 10px;">
           <button id="modal-sub-btn" onclick="toggleSubscribe(currentSelectedUid)" class="btn btn-red" style="width: 100%; border-radius: 20px; padding: 10px; font-size: 1rem;">
             Subscribe
           </button>
         </div>
 
-        <!-- 🎨 Owner Channel Studio Controls (Visible only to Channel Owner) -->
+        <!-- 🎁 V5 Package Code Redemption Box (Visible on own profile) -->
+        <div id="package-redemption-box" style="display: none; background: #121212; padding: 12px; border-radius: 6px; margin-top: 15px; border: 1px dashed #0088ff; text-align: left;">
+          <p style="font-size: 0.85rem; color: #0088ff; margin-bottom: 6px; font-weight: bold;">🎁 Redeem Package Code</p>
+          <p style="color: #aaa; font-size: 0.75rem; margin-bottom: 8px;">Enter code purchased from StreamKids-Hub:</p>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" id="redeem-code-input" placeholder="e.g. SK-STAR-8821" class="dark-input flex-input" style="font-size: 0.8rem; padding: 6px;">
+            <button onclick="redeemKidPackageCode()" class="btn btn-blue" style="padding: 6px 12px; font-size: 0.8rem;">Redeem</button>
+          </div>
+        </div>
+
+        <!-- 🎨 V5 Theme & Package Switcher (Visible on own profile) -->
+        <div id="theme-switcher-box" style="display: none; background: #121212; padding: 12px; border-radius: 6px; margin-top: 12px; border: 1px solid #333; text-align: left;">
+          <p style="font-size: 0.85rem; color: #00ffcc; margin-bottom: 6px; font-weight: bold;">🎨 Theme & Package Switcher</p>
+          <select id="theme-package-select" class="dark-input full-width" style="font-size: 0.8rem; padding: 6px;" onchange="switchUserActiveTheme(this.value)">
+            <option value="default">Dark Mode (Default Theme)</option>
+            <option id="opt-star-creator" value="star_creator" disabled>⭐ Star Creator Package (Locked)</option>
+            <option id="opt-owner-verified" value="owner_verified" disabled>🔨 Owner Verified Package (Locked)</option>
+          </select>
+        </div>
+
+        <!-- Channel Studio Controls -->
         <div id="owner-studio-controls" class="admin-control-box" style="display: none; border-color: #0088ff;">
           <p style="font-size: 0.85rem; color: #0088ff; margin-bottom: 8px; font-weight: bold; text-align: center;">🎬 Channel Studio Controls</p>
           <button onclick="editChannelName()" class="btn btn-blue" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; margin-bottom: 6px;">
@@ -901,9 +907,9 @@
           </button>
         </div>
 
-        <!-- 👑 Admin Verification & Override Controls -->
+        <!-- Admin Verification & Override Controls -->
         <div id="admin-verify-controls" class="admin-control-box" style="display: none;">
-          <p style="font-size: 0.8rem; color: #ffd700; margin-bottom: 8px; font-weight: bold; text-align: center;">👑 Global Admin Controls</p>
+          <p style="font-size: 0.8rem; color: #ffd700; margin-bottom: 8px; font-weight: bold; text-align: center;">👑 Owner / Admin Controls</p>
           <button id="toggle-verify-btn" onclick="toggleUserVerification()" class="btn btn-blue" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; margin-bottom: 6px;">
             Grant Verified Badge
           </button>
@@ -915,7 +921,7 @@
     </div>
   </div>
 
-  <!-- StreamKids System Crash Screen Overlay -->
+  <!-- Crash Screen Overlay -->
   <div id="crash-screen" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0f172a; color: #ffffff; z-index: 99999; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-family: system-ui, -apple-system, sans-serif; padding: 20px; box-sizing: border-box;">
     <div style="font-size: 64px; margin-bottom: 12px;">⚠️</div>
     <h1 style="font-size: 30px; color: #ef4444; margin: 0 0 10px 0;">STREAMKIDS HAS CRASHED</h1>
@@ -930,7 +936,7 @@
     </button>
   </div>
 
-  <!-- News Ticker Shutdown Overlay -->
+  <!-- Shutdown Overlay -->
   <div id="shutdown-screen" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 9999; flex-direction: column; justify-content: center; align-items: center;">
     <div style="font-size: 3rem; font-weight: bold; color: #ff0000; letter-spacing: 4px; margin-bottom: 20px; text-shadow: 0 0 10px #ff0000;">
       OFF AIR
