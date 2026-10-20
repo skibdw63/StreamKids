@@ -25,6 +25,12 @@
   <script src="js/app-ui.js"></script>
 
   <style>
+    :root {
+      --bg-primary: #121212;
+      --bg-card: #1e1e1e;
+      --border-color: #333333;
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -32,10 +38,11 @@
     }
 
     body {
-      background-color: #121212;
+      background-color: var(--bg-primary);
       color: #ffffff;
       font-family: Arial, Helvetica, sans-serif;
       padding: 20px;
+      transition: background-color 0.3s ease;
     }
 
     /* Auth Header Styling */
@@ -43,10 +50,12 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: #1e1e1e;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
       padding: 12px 20px;
       border-radius: 6px;
       margin-bottom: 15px;
+      transition: background 0.3s ease, border-color 0.3s ease;
     }
 
     .auth-bar .brand-title {
@@ -78,9 +87,9 @@
     }
 
     .nav-btn {
-      background: #222222;
+      background: var(--bg-card);
       color: #ffffff;
-      border: 1px solid #333333;
+      border: 1px solid var(--border-color);
       padding: 8px 16px;
       font-size: 0.95rem;
       border-radius: 4px;
@@ -93,10 +102,12 @@
 
     /* Main Dashboard Panels */
     .card-panel {
-      background: #1e1e1e;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
       padding: 20px;
       border-radius: 6px;
       margin-bottom: 15px;
+      transition: background 0.3s ease, border-color 0.3s ease;
     }
 
     .card-panel h2 {
@@ -132,8 +143,8 @@
     }
 
     .dark-input {
-      background: #121212;
-      border: 1px solid #333333;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
       color: #ffffff;
       padding: 8px 12px;
       border-radius: 4px;
@@ -209,9 +220,11 @@
     }
 
     .video-card, .chat-card {
-      background: #1e1e1e;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
       padding: 15px;
       border-radius: 6px;
+      transition: background 0.3s ease, border-color 0.3s ease;
     }
 
     .video-card h3, .chat-card h3 {
@@ -246,8 +259,8 @@
     }
 
     .chat-box {
-      background: #121212;
-      border: 1px solid #222222;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
       border-radius: 4px;
       flex: 1;
       min-height: 450px;
@@ -291,7 +304,7 @@
     }
 
     .upload-form-box {
-      background: #121212;
+      background: var(--bg-primary);
       padding: 15px;
       border-radius: 6px;
       max-width: 500px;
@@ -319,13 +332,13 @@
     }
 
     .modal-content {
-      background: #1e1e1e;
+      background: var(--bg-card);
       border-radius: 8px;
       width: 90%;
       max-width: 460px;
       text-align: center;
       position: relative;
-      border: 1px solid #333333;
+      border: 1px solid var(--border-color);
       padding: 0;
       overflow: hidden;
       max-height: 90vh;
@@ -360,13 +373,13 @@
       height: 80px;
       border-radius: 50%;
       margin-bottom: 5px;
-      border: 3px solid #1e1e1e;
+      border: 3px solid var(--bg-card);
       background: #222;
       object-fit: cover;
     }
 
     .admin-control-box {
-      background: #121212;
+      background: var(--bg-primary);
       padding: 12px;
       border-radius: 6px;
       margin-top: 15px;
