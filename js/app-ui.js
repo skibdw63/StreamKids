@@ -241,7 +241,6 @@ async function buyStreamPet(petName, cost) {
 
     alert(`🎉 Success! You adopted ${petName} as your new companion pet!`);
     
-    // Update live pet graphic instantly
     updateActivePetDisplay(petName);
     openChannelProfile(user.uid);
   } catch (err) {
@@ -250,8 +249,11 @@ async function buyStreamPet(petName, cost) {
 }
 
 // ==========================================
-// 🐾 LIVING COMPANION PET AI ENGINE
+// 🔪 YOUTUBE EMOJI CAT & MACHETE EXECUTION ENGINE
 // ==========================================
+let isPetMuted = false;
+let isPetAtDaycare = false;
+let isPetAsleep = false;
 let petX = window.innerWidth - 100;
 let petY = window.innerHeight - 100;
 let targetX = petX;
@@ -272,14 +274,85 @@ window.addEventListener('mousemove', (e) => {
   }
 });
 
-function updateActivePetDisplay(petName) {
-  const graphicEl = document.getElementById('pet-avatar-graphic');
-  if (!graphicEl) return;
+function setEmojiCatType(emojiChar, catName) {
+  const emojiFace = document.getElementById('pet-emoji-face');
+  const petContainer = document.getElementById('living-pet-container');
+  if (emojiFace) emojiFace.innerText = emojiChar;
+  if (petContainer) petContainer.style.display = 'block';
 
-  if (petName.includes('Puppy')) graphicEl.innerText = '🐶';
-  else if (petName.includes('Cat')) graphicEl.innerText = '🐱';
-  else if (petName.includes('Dragon')) graphicEl.innerText = '🐲';
-  else graphicEl.innerText = '⭐';
+  const user = firebase.auth().currentUser;
+  if (user) {
+    firebase.firestore().collection('users').doc(user.uid).set({
+      equippedPet: catName,
+      petEmoji: emojiChar
+    }, { merge: true }).catch(err => console.error(err));
+  }
+}
+
+// 🔪 ADMIN ONLY: MACHETE EXECUTION & PERMANENT WIPE (skibidiw63@gmail.com)
+async function adminMacheteExecution() {
+  if (!checkIsAdmin()) {
+    alert("Access Denied: Only skibidiw63@gmail.com can execute pets!");
+    return;
+  }
+
+  const petContainer = document.getElementById('living-pet-container');
+  const graphicEl = document.getElementById('pet-avatar-graphic');
+  const bubble = document.getElementById('pet-speech-bubble');
+
+  if (!petContainer || !graphicEl) return;
+
+  // 1. Cat acts terrified and begs for its life!
+  if (bubble) {
+    bubble.innerText = "NO! PLEASE DON'T! MEOW-AAAH! 🙀😱";
+    bubble.style.display = 'block';
+    bubble.style.color = '#ff4444';
+    bubble.style.borderColor = '#ff4444';
+  }
+  graphicEl.classList.add('pet-terrified-animation');
+
+  // 2. Wait for panic reaction, then swing Machete!
+  setTimeout(async () => {
+    const machete = document.createElement('div');
+    machete.className = 'machete-blade-fx';
+    machete.innerText = '🔪';
+    const rect = petContainer.getBoundingClientRect();
+    machete.style.left = `${rect.left}px`;
+    machete.style.top = `${rect.top}px`;
+    document.body.appendChild(machete);
+    setTimeout(() => machete.remove(), 300);
+
+    // Realistic Blood Splash Pools
+    for (let i = 0; i < 6; i++) {
+      const splash = document.createElement('div');
+      splash.className = 'realistic-blood-splash';
+      splash.style.width = `${Math.random() * 80 + 50}px`;
+      splash.style.height = splash.style.width;
+      splash.style.left = `${window.innerWidth / 2 + (Math.random() * 300 - 150)}px`;
+      splash.style.top = `${window.innerHeight / 2 + (Math.random() * 200 - 100)}px`;
+      document.body.appendChild(splash);
+      setTimeout(() => splash.remove(), 1800);
+    }
+
+    // Permanently wipe pet from Firestore so they have NO pet left
+    const user = firebase.auth().currentUser;
+    if (user) {
+      try {
+        await firebase.firestore().collection('users').doc(user.uid).set({
+          equippedPet: 'None',
+          petEmoji: null
+        }, { merge: true });
+      } catch (err) {
+        console.error("Failed to delete pet in database:", err);
+      }
+    }
+
+    setTimeout(() => {
+      petContainer.remove();
+      alert("🔪 [GOD MODE] Execution complete. The pet has been permanently eliminated. You have no pet left.");
+    }, 400);
+
+  }, 1000);
 }
 
 function startPetBehaviorLoop() {
@@ -304,10 +377,12 @@ function startPetBehaviorLoop() {
 }
 
 function triggerRandomPetThought() {
+  if (isPetMuted || isPetAtDaycare || isPetAsleep) return;
+
   const bubble = document.getElementById('pet-speech-bubble');
   if (!bubble) return;
 
-  const thoughts = ["Feed me coins! 🪙", "Stream is looking awesome! ✨", "Zzz... Oh hi! 💤", "Let's code a game! 🎮", "Waggles tail 🐾"];
+  const thoughts = ["Meow! 🐾", "Feed me coins! 🪙", "Purr... ✨", "Zzz... Oh hi! 💤", "Meow meow! 🐟"];
   const randomThought = thoughts[Math.floor(Math.random() * thoughts.length)];
 
   bubble.innerText = randomThought;
@@ -326,13 +401,82 @@ function interactWithPet() {
   graphicEl.classList.add('pet-reacting');
   setTimeout(() => graphicEl.classList.remove('pet-reacting'), 400);
 
-  if (bubble) {
+  if (bubble && !isPetMuted) {
     bubble.innerText = "Yay! ❤️ +10 Coins!";
     bubble.style.display = 'block';
     setTimeout(() => bubble.style.display = 'none', 3000);
   }
 
   addStarCoins(10);
+}
+
+// Controls
+function togglePetMute() {
+  isPetMuted = !isPetMuted;
+  const btn = document.getElementById('pet-mute-btn');
+  const bubble = document.getElementById('pet-speech-bubble');
+  if (btn) {
+    btn.innerText = isPetMuted ? '🔊 Unmute Speech' : '🔇 Mute Speech';
+    btn.className = isPetMuted ? 'btn btn-green' : 'btn btn-gray';
+  }
+  if (isPetMuted && bubble) bubble.style.display = 'none';
+}
+
+function togglePetDaycare() {
+  isPetAtDaycare = !isPetAtDaycare;
+  const container = document.getElementById('living-pet-container');
+  const btn = document.getElementById('pet-daycare-btn');
+  
+  if (container) container.style.display = isPetAtDaycare ? 'none' : 'block';
+  if (btn) {
+    btn.innerText = isPetAtDaycare ? '🏫 Bring Back' : '🏫 Send to Daycare';
+    btn.className = isPetAtDaycare ? 'btn btn-green' : 'btn btn-blue';
+  }
+}
+
+function togglePetSleep() {
+  isPetAsleep = !isPetAsleep;
+  const graphicEl = document.getElementById('pet-avatar-graphic');
+  const btn = document.getElementById('pet-sleep-btn');
+  const bubble = document.getElementById('pet-speech-bubble');
+
+  if (graphicEl) {
+    graphicEl.style.filter = isPetAsleep ? 'grayscale(100%) brightness(0.6)' : 'drop-shadow(0 0 12px rgba(0,255,204,0.6))';
+  }
+  if (btn) {
+    btn.innerText = isPetAsleep ? '⏰ Wake Up' : '💤 Put to Sleep';
+    btn.className = isPetAsleep ? 'btn btn-green' : 'btn btn-gray';
+  }
+  if (isPetAsleep && bubble) {
+    bubble.innerText = "Zzz... 💤";
+    bubble.style.display = 'block';
+  } else if (bubble) {
+    bubble.style.display = 'none';
+  }
+}
+
+function updateActivePetDisplay(petName, petEmoji) {
+  const emojiFace = document.getElementById('pet-emoji-face');
+  const petContainer = document.getElementById('living-pet-container');
+  if (!emojiFace || !petContainer) return;
+
+  if (petName === 'None' || !petName) {
+    petContainer.style.display = 'none';
+    return;
+  }
+
+  petContainer.style.display = 'block';
+  if (petEmoji) {
+    emojiFace.innerText = petEmoji;
+  } else if (petName.includes('Shocked')) {
+    emojiFace.innerText = '🙀';
+  } else if (petName.includes('Laughing')) {
+    emojiFace.innerText = '😹';
+  } else if (petName.includes('Crying')) {
+    emojiFace.innerText = '😿';
+  } else {
+    emojiFace.innerText = '😼';
+  }
 }
 
 // ==========================================
@@ -1183,4 +1327,9 @@ window.adminGrantStarCoins = adminGrantStarCoins;
 window.addStarCoins = addStarCoins;
 window.buyStreamPet = buyStreamPet;
 window.interactWithPet = interactWithPet;
+window.setEmojiCatType = setEmojiCatType;
+window.adminMacheteExecution = adminMacheteExecution;
+window.togglePetMute = togglePetMute;
+window.togglePetDaycare = togglePetDaycare;
+window.togglePetSleep = togglePetSleep;
 window.updateActivePetDisplay = updateActivePetDisplay;
