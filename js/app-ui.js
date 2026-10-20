@@ -257,11 +257,9 @@ async function loadAndApplyUserTheme(uid) {
 
 function applyThemeBranding(themeKey) {
   const logoContainer = document.getElementById('app-logo-title');
-  const root = document.documentElement;
   const bodyEl = document.body;
   if (!logoContainer) return;
 
-  // Helper to update all cards and panels app-wide for Roblox custom themes
   const cards = document.querySelectorAll('.card-panel, .video-card, .chat-card, .auth-bar');
 
   switch (themeKey) {
@@ -274,10 +272,6 @@ function applyThemeBranding(themeKey) {
           </span>
         </div>
       `;
-      // Full App Theme: Crimson & Gold fire aesthetic
-      root.style.setProperty('--bg-primary', '#120505');
-      root.style.setProperty('--bg-card', '#220b0b');
-      root.style.setProperty('--border-color', '#ff4444');
       if (bodyEl) {
         bodyEl.style.backgroundColor = '#120505';
         bodyEl.style.borderTop = "4px solid #ff0000";
@@ -297,10 +291,6 @@ function applyThemeBranding(themeKey) {
           </span>
         </div>
       `;
-      // Full App Theme: Cyan & Electric Blue aesthetic
-      root.style.setProperty('--bg-primary', '#041018');
-      root.style.setProperty('--bg-card', '#0a1d29');
-      root.style.setProperty('--border-color', '#00ffcc');
       if (bodyEl) {
         bodyEl.style.backgroundColor = '#041018';
         bodyEl.style.borderTop = "4px solid #00ffcc";
@@ -313,10 +303,6 @@ function applyThemeBranding(themeKey) {
 
     default:
       logoContainer.innerHTML = `<span style="color: #0088ff; font-weight: bold; font-size: 1.2rem;">StreamKids</span>`;
-      // Default Dark Theme
-      root.style.setProperty('--bg-primary', '#121212');
-      root.style.setProperty('--bg-card', '#1e1e1e');
-      root.style.setProperty('--border-color', '#333333');
       if (bodyEl) {
         bodyEl.style.backgroundColor = '#121212';
         bodyEl.style.borderTop = "none";
@@ -540,7 +526,7 @@ function renderFYPList(videos) {
     const card = document.createElement('div');
     card.className = 'video-card';
     card.style.marginBottom = '24px';
-    card.style.background = 'var(--bg-card, #181818)';
+    card.style.background = '#181818';
     card.style.padding = '14px';
     card.style.borderRadius = '10px';
 
@@ -646,7 +632,6 @@ function loadVideoComments(videoId) {
         const commentEl = document.createElement('div');
         commentEl.style.cssText = "margin-bottom: 6px; font-size: 0.85rem; background: #111; padding: 6px 10px; border-radius: 6px;";
         commentEl.innerHTML = `<strong style="color: #0088ff;">@${author}:</strong> <span style="color: #ddd;">${text}</span>`;
-        commentEl.style.background = 'var(--bg-card, #111)';
         container.appendChild(commentEl);
       });
     }, (err) => {
