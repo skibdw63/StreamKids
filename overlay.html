@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StreamKids OBS Overlay</title>
+  <!-- Firebase Compatibility SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <style>
+    body {
+      background: transparent !important;
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      color: #fff;
+      overflow: hidden;
+    }
+    .obs-widget {
+      background: rgba(18, 18, 18, 0.85);
+      border: 2px solid #00ffcc;
+      border-radius: 12px;
+      padding: 15px 25px;
+      display: inline-block;
+      box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+    }
+    /* Soccer Scoreboard Style */
+    .scoreboard {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 2rem;
+      font-weight: bold;
+    }
+    .score-num {
+      color: #ffd700;
+      background: #000;
+      padding: 5px 15px;
+      border-radius: 8px;
+      border: 1px solid #444;
+    }
+    /* Timer Style */
+    .timer-display {
+      font-size: 3rem;
+      font-weight: bold;
+      color: #00ffcc;
+      font-family: monospace;
+      text-shadow: 0 0 10px rgba(0,255,204,0.6);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="overlay-container" class="obs-widget">
+    <p style="margin:0; font-size: 0.9rem; color: #aaa;">Loading StreamKids OBS Overlay...</p>
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const uid = urlParams.get('user');
+
+      if (!uid) {
+        document.getElementById('overlay-container').innerHTML = "⚠️ Error: No User ID specified in overlay URL.";
+        return;
+      }
+
+      const db = firebase.firestore();
+
+      // Listen in real-time to the user's active OBS overlay settings in Firestore
+      db.collection('users').doc(uid).collection('obsOverlay').doc('settings')
+        .onSnapshot((doc) => {
+          const container = document.getElementById('overlay-container');
+          if (!doc.exists) {
+            container.innerHTML = "<div>StreamKids Standard Overlay</div>";
+            return;
+          }
+
+          const data = doc.data();
+          const widgetType = data.type || 'soccer';
+
+          if (widgetType === 'soccer') {
+            container.innerHTML = `
+              <div style="font-size: 0.8rem; color: #00ffcc; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;">⚽ ${data.matchTitle || 'Live Match'}</div>
+              <div class="scoreboard">
+                <span>${data.teamA || 'Home'}</span>
+                <span class="score-num">${data.scoreA || 0}</span>
+                <span style="color: #888;">-</span>
+                <span class="score-num">${data.scoreB || 0}</span>
+                <span>${data.teamB || 'Away'}</span>
+              </div>
+            `;
+          } else if (widgetType === 'timer') {
+            container.innerHTML = `
+              <div style="font-size: 0.8rem; color: #ffd700; margin-bottom: 4px; text-transform: uppercase;">⏳ ${data.timerTitle || 'Countdown'}</div>
+              <div class="timer-display" id="obs-timer">${data.timerValue || '10:00'}</div>
+            `;
+          } else if (widgetType === 'text') {
+            container.innerHTML = `
+              <div style="font-size: 1.5rem; font-weight: bold; color: #fff;">📢 ${data.customText || 'Welcome to the Stream!'}</div>
+            `;
+          }
+        }, (err) => {
+          console.error("Failed to load overlay:", err);
+        });
+    });
+  </script>
+</body>
+</html>
