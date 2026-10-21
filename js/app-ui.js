@@ -249,6 +249,52 @@ async function buyStreamPet(petName, cost) {
 }
 
 // ==========================================
+// 🎁 INTERACTIVE STREAM GIFTS & LIVE HUB HUB
+// ==========================================
+async function sendSuperGift(giftName, coinCost) {
+  const user = firebase.auth().currentUser;
+  if (!user) {
+    alert("Please log in to send a super gift!");
+    return;
+  }
+
+  const userRef = firebase.firestore().collection('users').doc(user.uid);
+
+  try {
+    await firebase.firestore().runTransaction(async (transaction) => {
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists) throw "User profile not found!";
+
+      const coins = userDoc.data().starCoins || 0;
+      if (coins < coinCost) {
+        throw new Error(`Not enough Star Coins! You need ${coinCost} coins, but you have ${coins}.`);
+      }
+
+      transaction.update(userRef, {
+        starCoins: coins - coinCost
+      });
+    });
+
+    // Broadcast gift blast to chat / live overlay
+    alert(`🎁 Successfully sent ${giftName} for ${coinCost} Star Coins! 🎉✨`);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function publishLivePoll() {
+  const questionInput = document.getElementById('poll-question-input');
+  if (!questionInput || !questionInput.value.trim()) {
+    alert("Please enter a poll question first!");
+    return;
+  }
+
+  const question = questionInput.value.trim();
+  alert(`📊 Live Poll Published to Chat & Stream:\n"${question}"`);
+  questionInput.value = '';
+}
+
+// ==========================================
 // 🔪 YOUTUBE EMOJI CAT & MACHETE EXECUTION ENGINE
 // ==========================================
 let isPetMuted = false;
@@ -265,6 +311,9 @@ window.addEventListener('DOMContentLoaded', () => {
     petElement = document.getElementById('living-pet-container');
     startPetBehaviorLoop();
   }, 1000);
+
+  // Initialize OBS Studio Overlay Link on Load
+  generateObsBrowserLink();
 });
 
 window.addEventListener('mousemove', (e) => {
@@ -302,7 +351,6 @@ async function adminMacheteExecution() {
 
   if (!petContainer || !graphicEl) return;
 
-  // 1. Cat acts terrified and begs for its life!
   if (bubble) {
     bubble.innerText = "NO! PLEASE DON'T! MEOW-AAAH! 🙀😱";
     bubble.style.display = 'block';
@@ -311,7 +359,6 @@ async function adminMacheteExecution() {
   }
   graphicEl.classList.add('pet-terrified-animation');
 
-  // 2. Wait for panic reaction, then swing Machete!
   setTimeout(async () => {
     const machete = document.createElement('div');
     machete.className = 'machete-blade-fx';
@@ -322,7 +369,6 @@ async function adminMacheteExecution() {
     document.body.appendChild(machete);
     setTimeout(() => machete.remove(), 300);
 
-    // Realistic Blood Splash Pools
     for (let i = 0; i < 6; i++) {
       const splash = document.createElement('div');
       splash.className = 'realistic-blood-splash';
@@ -334,7 +380,6 @@ async function adminMacheteExecution() {
       setTimeout(() => splash.remove(), 1800);
     }
 
-    // Permanently wipe pet from Firestore so they have NO pet left
     const user = firebase.auth().currentUser;
     if (user) {
       try {
@@ -476,6 +521,76 @@ function updateActivePetDisplay(petName, petEmoji) {
     emojiFace.innerText = '😿';
   } else {
     emojiFace.innerText = '😼';
+  }
+}
+
+// ==========================================
+// 📺 OBS STREAM OVERLAY STUDIO CONTROLLER
+// ==========================================
+function toggleObsFields(widgetType) {
+  const soccerBox = document.getElementById('obs-fields-soccer');
+  const timerBox = document.getElementById('obs-fields-timer');
+  const textBox = document.getElementById('obs-fields-text');
+
+  if (soccerBox) soccerBox.style.display = widgetType === 'soccer' ? 'block' : 'none';
+  if (timerBox) timerBox.style.display = widgetType === 'timer' ? 'block' : 'none';
+  if (textBox) textBox.style.display = widgetType === 'text' ? 'block' : 'none';
+
+  generateObsBrowserLink();
+}
+
+function generateObsBrowserLink() {
+  const widgetSelect = document.getElementById('obs-widget-type');
+  const linkInput = document.getElementById('obs-generated-link');
+  if (!widgetSelect || !linkInput) return;
+
+  const widgetType = widgetSelect.value;
+  const baseUrl = window.location.href.split('?')[0].replace(/index\.html$/, '');
+  const overlayUrl = `${baseUrl}obs-overlay.html?widget=${widgetType}`;
+  linkInput.value = overlayUrl;
+}
+
+function copyObsLink() {
+  const linkInput = document.getElementById('obs-generated-link');
+  if (!linkInput) return;
+  linkInput.select();
+  linkInput.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(linkInput.value);
+  alert("📋 OBS Browser Source link copied to clipboard!");
+}
+
+async function saveAndPublishObsOverlay() {
+  const user = firebase.auth().currentUser;
+  if (!user) {
+    alert("Please sign in with Google to update OBS overlays!");
+    return;
+  }
+
+  const widgetSelect = document.getElementById('obs-widget-type');
+  if (!widgetSelect) return;
+  const widgetType = widgetSelect.value;
+
+  let overlayData = { widgetType: widgetType, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+
+  if (widgetType === 'soccer') {
+    overlayData.matchTitle = document.getElementById('obs-match-title').value || 'Match Finals';
+    overlayData.teamA = document.getElementById('obs-team-a').value || 'Home Team';
+    overlayData.scoreA = Number(document.getElementById('obs-score-a').value) || 0;
+    overlayData.teamB = document.getElementById('obs-team-b').value || 'Away Team';
+    overlayData.scoreB = Number(document.getElementById('obs-score-b').value) || 0;
+  } else if (widgetType === 'timer') {
+    overlayData.timerTitle = document.getElementById('obs-timer-title').value || 'Starting Soon';
+    overlayData.timerVal = document.getElementById('obs-timer-val').value || '05:00';
+  } else if (widgetType === 'text') {
+    overlayData.customText = document.getElementById('obs-custom-text').value || 'Welcome to the Stream!';
+  }
+
+  try {
+    await firebase.firestore().collection('obsOverlays').doc(user.uid).set(overlayData, { merge: true });
+    alert("💾 OBS Overlay successfully updated in real-time!");
+  } catch (err) {
+    console.error("Failed to save OBS overlay:", err);
+    alert("Error updating OBS overlay: " + err.message);
   }
 }
 
@@ -1326,6 +1441,8 @@ window.grantOwnerVerifiedPackage = grantOwnerVerifiedPackage;
 window.adminGrantStarCoins = adminGrantStarCoins;
 window.addStarCoins = addStarCoins;
 window.buyStreamPet = buyStreamPet;
+window.sendSuperGift = sendSuperGift;
+window.publishLivePoll = publishLivePoll;
 window.interactWithPet = interactWithPet;
 window.setEmojiCatType = setEmojiCatType;
 window.adminMacheteExecution = adminMacheteExecution;
@@ -1333,3 +1450,7 @@ window.togglePetMute = togglePetMute;
 window.togglePetDaycare = togglePetDaycare;
 window.togglePetSleep = togglePetSleep;
 window.updateActivePetDisplay = updateActivePetDisplay;
+window.toggleObsFields = toggleObsFields;
+window.generateObsBrowserLink = generateObsBrowserLink;
+window.copyObsLink = copyObsLink;
+window.saveAndPublishObsOverlay = saveAndPublishObsOverlay;
