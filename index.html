@@ -462,6 +462,58 @@
     let currentSelectedUid = null;
     let currentSelectedUserVerified = false;
 
+    // Background Music Engine Script
+    let bgMusic = null;
+    let isMusicUserPaused = false;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      bgMusic = document.getElementById('bg-music');
+      if (bgMusic) {
+        bgMusic.volume = 0.3; // Comfort volume (30%)
+
+        // Try to play immediately when the website opens
+        const playPromise = bgMusic.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.log("Browser blocked autoplay on load. Waiting for first interaction...");
+          });
+        }
+      }
+
+      // Fallback: Starts music instantly on your very first click, tap, or keystroke anywhere on the page
+      const startAudioOnFirstInteract = () => {
+        if (bgMusic && bgMusic.paused && !isMusicUserPaused) {
+          const activeVideo = document.querySelector('.video-card iframe, #remote-webcam');
+          if (!activeVideo || activeVideo.paused) {
+            bgMusic.play().catch(err => console.log("Play failed:", err));
+          }
+        }
+        window.removeEventListener('click', startAudioOnFirstInteract);
+        window.removeEventListener('touchstart', startAudioOnFirstInteract);
+        window.removeEventListener('keydown', startAudioOnFirstInteract);
+      };
+
+      window.addEventListener('click', startAudioOnFirstInteract);
+      window.addEventListener('touchstart', startAudioOnFirstInteract);
+      window.addEventListener('keydown', startAudioOnFirstInteract);
+    });
+
+    // 🎵 PAUSE MUSIC: Call this when a video or stream starts playing
+    function pauseMusicForMedia() {
+      if (bgMusic && !bgMusic.paused) {
+        bgMusic.pause();
+        console.log("Background music paused for media playback.");
+      }
+    }
+
+    // 🎵 RESUME MUSIC: Call this when a video or stream stops / closes
+    function resumeMusicForMedia() {
+      if (bgMusic && bgMusic.paused && !isMusicUserPaused) {
+        bgMusic.play().catch(err => console.log("Resume audio failed:", err));
+        console.log("Background music resumed.");
+      }
+    }
+
     // Triggered on Form Submit
     function handleKidUploadSubmit() {
       const fileInput = document.getElementById('video-file-input');
@@ -1183,6 +1235,9 @@
       Turn Back On (Admin Only)
     </button>
   </div>
+
+  <!-- 🌅 Pixel Sunset Background Music Engine -->
+  <audio id="bg-music" src="Pixel Sunset.mp3" preload="auto" loop></audio>
 
 </body>
 </html>
