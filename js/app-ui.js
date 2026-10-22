@@ -17,15 +17,37 @@ function showTab(tabId) {
   }
 }
 
-// Authentication Handlers
+// Authentication Handlers (Updated for GitHub Pages COOP & Redirect compatibility)
 function loginWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  firebase.auth().signInWithPopup(provider).catch(err => alert(err.message));
+  provider.setCustomParameters({
+    prompt: 'select_account'
+  });
+
+  firebase.auth().signInWithPopup(provider)
+    .catch((err) => {
+      console.warn("Popup blocked or failed, switching to redirect method...", err);
+      // Fallback for browsers blocking cross-origin popups on GitHub Pages
+      firebase.auth().signInWithRedirect(provider);
+    });
 }
 
 function logoutUser() {
   firebase.auth().signOut();
 }
+
+// Handle Redirect Sign-In results on GitHub Pages load
+window.addEventListener('DOMContentLoaded', () => {
+  firebase.auth().getRedirectResult()
+    .then((result) => {
+      if (result && result.user) {
+        console.log("Signed in successfully via redirect:", result.user.email);
+      }
+    })
+    .catch((error) => {
+      console.error("Redirect auth error:", error);
+    });
+});
 
 // ==========================================
 // 🌅 PIXEL SUNSET BACKGROUND MUSIC MANAGER
