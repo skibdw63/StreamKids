@@ -10,6 +10,11 @@ function showTab(tabId) {
   if (tabId === 'fyp-tab') {
     loadFYP();
   }
+
+  // If leaving the live feed / video watch sections, ensure background music resumes if no videos are active
+  if (tabId !== 'feed' && tabId !== 'fyp-tab') {
+    resumeMusicForMedia();
+  }
 }
 
 // Authentication Handlers
@@ -20,6 +25,63 @@ function loginWithGoogle() {
 
 function logoutUser() {
   firebase.auth().signOut();
+}
+
+// ==========================================
+// 🌅 PIXEL SUNSET BACKGROUND MUSIC MANAGER
+// ==========================================
+let bgMusic = null;
+let isMusicUserPaused = false;
+
+window.addEventListener('DOMContentLoaded', () => {
+  bgMusic = document.getElementById('bg-music');
+  if (bgMusic) {
+    bgMusic.volume = 0.3; // Comfort volume (30%)
+
+    // Try to play immediately when the website opens
+    const playPromise = bgMusic.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(error => {
+        console.log("Browser blocked autoplay on load. Waiting for first interaction...");
+      });
+    }
+  }
+
+  // Fallback: Starts music instantly on your very first click, tap, or keystroke anywhere on the page
+  const startAudioOnFirstInteract = () => {
+    if (bgMusic && bgMusic.paused && !isMusicUserPaused) {
+      const activeVideo = document.querySelector('.video-card iframe, #remote-webcam');
+      if (!activeVideo || activeVideo.paused) {
+        bgMusic.play().catch(err => console.log("Play failed:", err));
+      }
+    }
+    window.removeEventListener('click', startAudioOnFirstInteract);
+    window.removeEventListener('touchstart', startAudioOnFirstInteract);
+    window.removeEventListener('keydown', startAudioOnFirstInteract);
+  };
+
+  window.addEventListener('click', startAudioOnFirstInteract);
+  window.addEventListener('touchstart', startAudioOnFirstInteract);
+  window.addEventListener('keydown', startAudioOnFirstInteract);
+});
+
+// 🎵 PAUSE MUSIC: Called when a video or stream starts playing
+function pauseMusicForMedia() {
+  if (bgMusic && !bgMusic.paused) {
+    bgMusic.pause();
+    console.log("Background music paused for media playback.");
+  }
+}
+
+// 🎵 RESUME MUSIC: Called when a video or stream stops / closes
+function resumeMusicForMedia() {
+  if (bgMusic && bgMusic.paused && !isMusicUserPaused) {
+    const activeVideo = document.querySelector('.video-card iframe');
+    if (!activeVideo) {
+      bgMusic.play().catch(err => console.log("Resume audio failed:", err));
+      console.log("Background music resumed.");
+    }
+  }
 }
 
 // ==========================================
@@ -1058,6 +1120,8 @@ function filterFYPFeed() {
 }
 
 function playThumbnailVideo(videoId, ytId) {
+  pauseMusicForMedia(); // 🎵 Pauses Pixel Sunset immediately when video starts!
+
   const container = document.getElementById(`media-container-${videoId}`);
   if (!container) return;
 
@@ -1466,3 +1530,5 @@ window.toggleObsFields = toggleObsFields;
 window.generateObsBrowserLink = generateObsBrowserLink;
 window.copyObsLink = copyObsLink;
 window.saveAndPublishObsOverlay = saveAndPublishObsOverlay;
+window.pauseMusicForMedia = pauseMusicForMedia;
+window.resumeMusicForMedia = resumeMusicForMedia;
