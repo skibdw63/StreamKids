@@ -316,6 +316,11 @@ window.addEventListener('DOMContentLoaded', () => {
   generateObsBrowserLink();
 });
 
+// Automatically update OBS link as soon as Firebase login state finishes loading
+firebase.auth().onAuthStateChanged((user) => {
+  generateObsBrowserLink();
+});
+
 window.addEventListener('mousemove', (e) => {
   if (Math.random() < 0.05) {
     targetX = e.clientX + 40;
@@ -542,9 +547,9 @@ function toggleObsFields(widgetType) {
 function generateObsBrowserLink() {
   const widgetSelect = document.getElementById('obs-widget-type');
   const linkInput = document.getElementById('obs-generated-link');
-  if (!widgetSelect || !linkInput) return;
+  if (!linkInput) return;
 
-  const widgetType = widgetSelect.value;
+  const widgetType = widgetSelect ? widgetSelect.value : 'soccer';
   const user = firebase.auth().currentUser;
 
   if (!user) {
