@@ -2,109 +2,115 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StreamKids OBS Overlay</title>
-  <!-- Firebase Compatibility SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-config.js"></script>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script> <!-- Make sure your firebase config is linked or paste it here -->
   <style>
     body {
-      background: transparent !important;
       margin: 0;
-      padding: 20px;
-      font-family: Arial, sans-serif;
+      background: transparent !important;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       color: #fff;
       overflow: hidden;
     }
-    .obs-widget {
+    .overlay-box {
       background: rgba(18, 18, 18, 0.85);
       border: 2px solid #00ffcc;
       border-radius: 12px;
-      padding: 15px 25px;
+      padding: 16px 24px;
       display: inline-block;
       box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+      margin: 20px;
     }
     /* Soccer Scoreboard Style */
-    .scoreboard {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      font-size: 2rem;
-      font-weight: bold;
-    }
-    .score-num {
-      color: #ffd700;
-      background: #000;
-      padding: 5px 15px;
-      border-radius: 8px;
-      border: 1px solid #444;
-    }
+    .soccer-container { text-align: center; }
+    .match-title { font-size: 1rem; color: #00ffcc; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+    .score-board { display: flex; align-items: center; gap: 16px; font-size: 1.8rem; font-weight: bold; }
+    .team { color: #fff; }
+    .score { background: #000; padding: 4px 12px; border-radius: 8px; color: #00ffcc; border: 1px solid #333; }
+
     /* Timer Style */
-    .timer-display {
-      font-size: 3rem;
-      font-weight: bold;
-      color: #00ffcc;
-      font-family: monospace;
-      text-shadow: 0 0 10px rgba(0,255,204,0.6);
-    }
+    .timer-container { text-align: center; }
+    .timer-title { font-size: 0.9rem; color: #ffaa00; margin-bottom: 4px; font-weight: bold; text-transform: uppercase; }
+    .timer-clock { font-size: 2.2rem; font-weight: bold; font-family: monospace; color: #fff; }
+
+    /* Custom Text Style */
+    .text-container { font-size: 1.4rem; font-weight: bold; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); }
   </style>
 </head>
 <body>
 
-  <div id="overlay-container" class="obs-widget">
-    <p style="margin:0; font-size: 0.9rem; color: #aaa;">Loading StreamKids OBS Overlay...</p>
+  <div id="widget-view" class="overlay-box">
+    <p style="margin: 0; color: #888;">Waiting for live overlay data...</p>
   </div>
 
   <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const uid = urlParams.get('user');
+    // Initialize Firebase if not already initialized
+    if (!firebase.apps.length) {
+      // Replace or ensure firebase-config.js has your config initialized
+      // Or paste your firebaseConfig initialization here if needed.
+    }
 
-      if (!uid) {
-        document.getElementById('overlay-container').innerHTML = "⚠️ Error: No User ID specified in overlay URL.";
+    const urlParams = new URLSearchParams(window.location.search);
+    const widgetType = urlParams.get('widget') || 'soccer';
+
+    // Note: If you want this overlay to track a specific streamer's UID, 
+    // you can pass ?uid=USER_ID in the OBS browser source URL, 
+    // or it can listen to a general/latest overlay document.
+    const streamerUid = urlParams.get('uid'); 
+
+    const db = firebase.firestore();
+
+    function listenToOverlay() {
+      // If no specific UID is provided in the URL, query the collection or use a fallback doc
+      // For simplicity, if you save under `obsOverlays/{uid}`, you can pass `?widget=soccer&uid=YOUR_FIREBASE_UID` in OBS.
+      if (!streamerUid) {
+        document.getElementById('widget-view').innerHTML = `<span style="color: #ff5555;">Error: Please add ?uid=YOUR_USER_ID to your OBS Browser Source URL!</span>`;
         return;
       }
 
-      const db = firebase.firestore();
+      db.collection('obsOverlays').doc(streamerUid).onSnapshot((doc) => {
+        if (!doc.exists) return;
+        const data = doc.data();
+        const container = document.getElementById('widget-view');
 
-      // Listen in real-time to the user's active OBS overlay settings in Firestore
-      db.collection('users').doc(uid).collection('obsOverlay').doc('settings')
-        .onSnapshot((doc) => {
-          const container = document.getElementById('overlay-container');
-          if (!doc.exists) {
-            container.innerHTML = "<div>StreamKids Standard Overlay</div>";
-            return;
-          }
-
-          const data = doc.data();
-          const widgetType = data.type || 'soccer';
-
-          if (widgetType === 'soccer') {
-            container.innerHTML = `
-              <div style="font-size: 0.8rem; color: #00ffcc; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;">⚽ ${data.matchTitle || 'Live Match'}</div>
-              <div class="scoreboard">
-                <span>${data.teamA || 'Home'}</span>
-                <span class="score-num">${data.scoreA || 0}</span>
-                <span style="color: #888;">-</span>
-                <span class="score-num">${data.scoreB || 0}</span>
-                <span>${data.teamB || 'Away'}</span>
+        if (data.widgetType === 'soccer' || widgetType === 'soccer') {
+          container.innerHTML = `
+            <div class="soccer-container">
+              <div class="match-title">${data.matchTitle || 'Match Finals'}</div>
+              <div class="score-board">
+                <span class="team">${data.teamA || 'Home'}</span>
+                <span class="score">${data.scoreA || 0}</span>
+                <span style="color: #666;">-</span>
+                <span class="score">${data.scoreB || 0}</span>
+                <span class="team">${data.teamB || 'Away'}</span>
               </div>
-            `;
-          } else if (widgetType === 'timer') {
-            container.innerHTML = `
-              <div style="font-size: 0.8rem; color: #ffd700; margin-bottom: 4px; text-transform: uppercase;">⏳ ${data.timerTitle || 'Countdown'}</div>
-              <div class="timer-display" id="obs-timer">${data.timerValue || '10:00'}</div>
-            `;
-          } else if (widgetType === 'text') {
-            container.innerHTML = `
-              <div style="font-size: 1.5rem; font-weight: bold; color: #fff;">📢 ${data.customText || 'Welcome to the Stream!'}</div>
-            `;
-          }
-        }, (err) => {
-          console.error("Failed to load overlay:", err);
-        });
+            </div>
+          `;
+        } else if (data.widgetType === 'timer' || widgetType === 'timer') {
+          container.innerHTML = `
+            <div class="timer-container">
+              <div class="timer-title">${data.timerTitle || 'Starting Soon'}</div>
+              <div class="timer-clock">${data.timerVal || '05:00'}</div>
+            </div>
+          `;
+        } else if (data.widgetType === 'text' || widgetType === 'text') {
+          container.innerHTML = `
+            <div class="text-container">
+              ${data.customText || 'Welcome to the Stream!'}
+            </div>
+          `;
+        }
+      }, (err) => {
+        console.error("Error fetching live overlay:", err);
+      });
+    }
+
+    // Start listening once DOM is loaded
+    window.addEventListener('DOMContentLoaded', () => {
+      listenToOverlay();
     });
   </script>
 </body>
