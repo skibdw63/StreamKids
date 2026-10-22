@@ -102,11 +102,8 @@ function pauseMusicForMedia() {
 // 🎵 RESUME MUSIC: Called when a video or stream stops / closes
 function resumeMusicForMedia() {
   if (window.bgMusic && window.bgMusic.paused && !window.isMusicUserPaused) {
-    const activeVideo = document.querySelector('.video-card iframe');
-    if (!activeVideo) {
-      window.bgMusic.play().catch(err => console.log("Resume audio failed:", err));
-      console.log("Background music resumed.");
-    }
+    window.bgMusic.play().catch(err => console.log("Resume audio failed:", err));
+    console.log("Background music resumed.");
   }
 }
 
@@ -1152,6 +1149,11 @@ function playThumbnailVideo(videoId, ytId) {
   if (!container) return;
 
   container.innerHTML = `
+    <div style="position: absolute; top: 10px; right: 10px; z-index: 10;">
+      <button onclick="event.stopPropagation(); closeThumbnailVideo('${videoId}', '${ytId}')" class="btn btn-red" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 12px; box-shadow: 0 0 8px rgba(0,0,0,0.8); cursor: pointer;">
+        ✖ Close Video & Resume Music
+      </button>
+    </div>
     <iframe 
       src="https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0&modestbranding=1" 
       title="StreamKids Video"
@@ -1161,6 +1163,24 @@ function playThumbnailVideo(videoId, ytId) {
       style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;">
     </iframe>
   `;
+}
+
+function closeThumbnailVideo(videoId, ytId) {
+  const container = document.getElementById(`media-container-${videoId}`);
+  if (!container) return;
+
+  const thumbUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+
+  // Restore thumbnail layout
+  container.innerHTML = `
+    <img src="${thumbUrl}" alt="Video Thumbnail" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://via.placeholder.com/480x360?text=StreamKids+Video'" />
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border-radius: 50%; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; border: 2px solid #fff;">
+      <div style="width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-left: 20px solid #fff; margin-left: 4px;"></div>
+    </div>
+  `;
+
+  // Resume background music instantly!
+  resumeMusicForMedia();
 }
 
 function toggleComments(videoId) {
@@ -1522,6 +1542,7 @@ window.uploadKidVideo = uploadKidVideo;
 window.loadFYP = loadFYP;
 window.filterFYPFeed = filterFYPFeed;
 window.playThumbnailVideo = playThumbnailVideo;
+window.closeThumbnailVideo = closeThumbnailVideo;
 window.toggleComments = toggleComments;
 window.postComment = postComment;
 window.triggerAvatarChange = triggerAvatarChange;
