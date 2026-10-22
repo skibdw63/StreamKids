@@ -545,8 +545,15 @@ function generateObsBrowserLink() {
   if (!widgetSelect || !linkInput) return;
 
   const widgetType = widgetSelect.value;
+  const user = firebase.auth().currentUser;
+
+  if (!user) {
+    linkInput.value = "Please sign in with Google first to generate your custom link!";
+    return;
+  }
+
   const baseUrl = window.location.href.split('?')[0].replace(/index\.html$/, '');
-  const overlayUrl = `${baseUrl}obs-overlay.html?widget=${widgetType}`;
+  const overlayUrl = `${baseUrl}obs-overlay.html?widget=${widgetType}&uid=${user.uid}`;
   linkInput.value = overlayUrl;
 }
 
