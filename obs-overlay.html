@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <title>StreamKids OBS Overlay</title>
-  <!-- Firebase SDKs -->
+  <!-- Firebase Compatibility SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-  <script src="firebase-config.js"></script> <!-- Make sure your firebase config is linked or paste it here -->
+  <script src="firebase-config.js"></script>
   <style>
     body {
       margin: 0;
@@ -16,12 +16,12 @@
       overflow: hidden;
     }
     .overlay-box {
-      background: rgba(18, 18, 18, 0.85);
+      background: rgba(18, 18, 18, 0.9);
       border: 2px solid #00ffcc;
       border-radius: 12px;
       padding: 16px 24px;
       display: inline-block;
-      box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+      box-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
       margin: 20px;
     }
     /* Soccer Scoreboard Style */
@@ -43,60 +43,59 @@
 <body>
 
   <div id="widget-view" class="overlay-box">
-    <p style="margin: 0; color: #888;">Waiting for live overlay data...</p>
+    <p style="margin: 0; color: #888;">Connecting to live stream data...</p>
   </div>
 
   <script>
-    // Initialize Firebase if not already initialized
-    if (!firebase.apps.length) {
-      // Replace or ensure firebase-config.js has your config initialized
-      // Or paste your firebaseConfig initialization here if needed.
-    }
-
     const urlParams = new URLSearchParams(window.location.search);
-    const widgetType = urlParams.get('widget') || 'soccer';
-
-    // Note: If you want this overlay to track a specific streamer's UID, 
-    // you can pass ?uid=USER_ID in the OBS browser source URL, 
-    // or it can listen to a general/latest overlay document.
+    const fallbackWidget = urlParams.get('widget') || 'soccer';
     const streamerUid = urlParams.get('uid'); 
 
-    const db = firebase.firestore();
+    function startOverlayListener() {
+      const container = document.getElementById('widget-view');
 
-    function listenToOverlay() {
-      // If no specific UID is provided in the URL, query the collection or use a fallback doc
-      // For simplicity, if you save under `obsOverlays/{uid}`, you can pass `?widget=soccer&uid=YOUR_FIREBASE_UID` in OBS.
       if (!streamerUid) {
-        document.getElementById('widget-view').innerHTML = `<span style="color: #ff5555;">Error: Please add ?uid=YOUR_USER_ID to your OBS Browser Source URL!</span>`;
+        container.innerHTML = `<span style="color: #ff5555;">Error: Missing ?uid= in OBS URL!</span>`;
         return;
       }
 
-      db.collection('obsOverlays').doc(streamerUid).onSnapshot((doc) => {
-        if (!doc.exists) return;
-        const data = doc.data();
-        const container = document.getElementById('widget-view');
+      if (typeof firebase === 'undefined' || !firebase.apps.length) {
+        container.innerHTML = `<span style="color: #ff5555;">Error: Firebase non-initialized! Check firebase-config.js</span>`;
+        return;
+      }
 
-        if (data.widgetType === 'soccer' || widgetType === 'soccer') {
+      const db = firebase.firestore();
+
+      db.collection('obsOverlays').doc(streamerUid).onSnapshot((doc) => {
+        if (!doc.exists) {
+          container.innerHTML = `<span style="color: #ffaa00;">Waiting for data... Click "Save & Publish" in App!</span>`;
+          return;
+        }
+
+        const data = doc.data();
+        const activeType = data.widgetType || data.type || fallbackWidget;
+
+        if (activeType === 'soccer') {
           container.innerHTML = `
             <div class="soccer-container">
               <div class="match-title">${data.matchTitle || 'Match Finals'}</div>
               <div class="score-board">
                 <span class="team">${data.teamA || 'Home'}</span>
-                <span class="score">${data.scoreA || 0}</span>
+                <span class="score">${data.scoreA !== undefined ? data.scoreA : 0}</span>
                 <span style="color: #666;">-</span>
-                <span class="score">${data.scoreB || 0}</span>
+                <span class="score">${data.scoreB !== undefined ? data.scoreB : 0}</span>
                 <span class="team">${data.teamB || 'Away'}</span>
               </div>
             </div>
           `;
-        } else if (data.widgetType === 'timer' || widgetType === 'timer') {
+        } else if (activeType === 'timer') {
           container.innerHTML = `
             <div class="timer-container">
               <div class="timer-title">${data.timerTitle || 'Starting Soon'}</div>
               <div class="timer-clock">${data.timerVal || '05:00'}</div>
             </div>
           `;
-        } else if (data.widgetType === 'text' || widgetType === 'text') {
+        } else if (activeType === 'text') {
           container.innerHTML = `
             <div class="text-container">
               ${data.customText || 'Welcome to the Stream!'}
@@ -104,13 +103,14 @@
           `;
         }
       }, (err) => {
-        console.error("Error fetching live overlay:", err);
+        console.error("Firestore Listen Error:", err);
+        container.innerHTML = `<span style="color: #ff4444;">Permission / Database Error: ${err.message}</span>`;
       });
     }
 
-    // Start listening once DOM is loaded
     window.addEventListener('DOMContentLoaded', () => {
-      listenToOverlay();
+      // Small timeout to allow firebase-config.js to load completely
+      setTimeout(startOverlayListener, 500);
     });
   </script>
 </body>
