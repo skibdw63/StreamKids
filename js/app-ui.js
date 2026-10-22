@@ -52,16 +52,20 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 // 🌅 PIXEL SUNSET BACKGROUND MUSIC MANAGER
 // ==========================================
-let bgMusic = null;
-let isMusicUserPaused = false;
+if (typeof window.bgMusic === 'undefined') {
+  window.bgMusic = null;
+}
+if (typeof window.isMusicUserPaused === 'undefined') {
+  window.isMusicUserPaused = false;
+}
 
 window.addEventListener('DOMContentLoaded', () => {
-  bgMusic = document.getElementById('bg-music');
-  if (bgMusic) {
-    bgMusic.volume = 0.3; // Comfort volume (30%)
+  window.bgMusic = document.getElementById('bg-music');
+  if (window.bgMusic) {
+    window.bgMusic.volume = 0.3; // Comfort volume (30%)
 
     // Try to play immediately when the website opens
-    const playPromise = bgMusic.play();
+    const playPromise = window.bgMusic.play();
     if (playPromise !== undefined) {
       playPromise.catch(error => {
         console.log("Browser blocked autoplay on load. Waiting for first interaction...");
@@ -71,10 +75,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Fallback: Starts music instantly on your very first click, tap, or keystroke anywhere on the page
   const startAudioOnFirstInteract = () => {
-    if (bgMusic && bgMusic.paused && !isMusicUserPaused) {
+    if (window.bgMusic && window.bgMusic.paused && !window.isMusicUserPaused) {
       const activeVideo = document.querySelector('.video-card iframe, #remote-webcam');
       if (!activeVideo || activeVideo.paused) {
-        bgMusic.play().catch(err => console.log("Play failed:", err));
+        window.bgMusic.play().catch(err => console.log("Play failed:", err));
       }
     }
     window.removeEventListener('click', startAudioOnFirstInteract);
@@ -89,18 +93,18 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // 🎵 PAUSE MUSIC: Called when a video or stream starts playing
 function pauseMusicForMedia() {
-  if (bgMusic && !bgMusic.paused) {
-    bgMusic.pause();
+  if (window.bgMusic && !window.bgMusic.paused) {
+    window.bgMusic.pause();
     console.log("Background music paused for media playback.");
   }
 }
 
 // 🎵 RESUME MUSIC: Called when a video or stream stops / closes
 function resumeMusicForMedia() {
-  if (bgMusic && bgMusic.paused && !isMusicUserPaused) {
+  if (window.bgMusic && window.bgMusic.paused && !window.isMusicUserPaused) {
     const activeVideo = document.querySelector('.video-card iframe');
     if (!activeVideo) {
-      bgMusic.play().catch(err => console.log("Resume audio failed:", err));
+      window.bgMusic.play().catch(err => console.log("Resume audio failed:", err));
       console.log("Background music resumed.");
     }
   }
