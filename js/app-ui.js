@@ -1116,6 +1116,9 @@ function renderFYPList(videos) {
         <button onclick="shareVideo('${ytId}')" class="btn btn-gray" style="padding: 6px 12px; border-radius: 16px; font-size: 0.85rem; cursor: pointer;">
           🔗 Share
         </button>
+        <button id="close-video-btn-${videoId}" onclick="closeThumbnailVideo('${videoId}', '${ytId}')" class="btn btn-red" style="display: none; padding: 6px 12px; border-radius: 16px; font-size: 0.85rem; cursor: pointer;">
+          ✖ Close Video & Resume Music
+        </button>
         ${checkIsAdmin() ? `
           <button onclick="adminOverrideStats('${videoId}', 'videos', 'likesCount', prompt('Set new like count:', '${likesCount}'))" style="background: #ffd700; color: #000; border: none; padding: 4px 10px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 11px;">
             👑 Edit Likes
@@ -1146,14 +1149,12 @@ function playThumbnailVideo(videoId, ytId) {
   pauseMusicForMedia(); // 🎵 Pauses Pixel Sunset immediately when video starts!
 
   const container = document.getElementById(`media-container-${videoId}`);
+  const closeBtn = document.getElementById(`close-video-btn-${videoId}`);
   if (!container) return;
 
+  if (closeBtn) closeBtn.style.display = 'inline-block'; // Show close button below video
+
   container.innerHTML = `
-    <div style="position: absolute; top: 10px; right: 10px; z-index: 10;">
-      <button onclick="event.stopPropagation(); closeThumbnailVideo('${videoId}', '${ytId}')" class="btn btn-red" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 12px; box-shadow: 0 0 8px rgba(0,0,0,0.8); cursor: pointer;">
-        ✖ Close Video & Resume Music
-      </button>
-    </div>
     <iframe 
       src="https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0&modestbranding=1" 
       title="StreamKids Video"
@@ -1167,7 +1168,10 @@ function playThumbnailVideo(videoId, ytId) {
 
 function closeThumbnailVideo(videoId, ytId) {
   const container = document.getElementById(`media-container-${videoId}`);
+  const closeBtn = document.getElementById(`close-video-btn-${videoId}`);
   if (!container) return;
+
+  if (closeBtn) closeBtn.style.display = 'none'; // Hide close button when closed
 
   const thumbUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
 
