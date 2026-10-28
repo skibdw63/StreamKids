@@ -281,11 +281,14 @@
       text-decoration: underline;
     }
 
-    .badge-icon {
-      color: #0088ff;
-      margin-left: 2px;
+    /* Secure Image Badge Styling */
+    .verified-badge {
+      width: 16px;
+      height: 16px;
+      vertical-align: middle;
+      margin-left: 3px;
       margin-right: 4px;
-      font-size: 0.95rem;
+      object-fit: contain;
     }
 
     .chat-input-row {
@@ -412,7 +415,7 @@
       animation: pet-bounce 0.4s ease !important;
     }
 
-    /* 🩸 Machete & Realistic Gore Animations */
+    /* Machete & Realistic Gore Animations */
     @keyframes machete-slash {
       0% { transform: translate(-120px, -120px) rotate(-45deg); opacity: 0; }
       50% { transform: translate(0, 0) rotate(15deg); opacity: 1; }
@@ -586,7 +589,7 @@
           if (petEl) petEl.innerText = data.equippedPet || 'Smug Cat';
 
           currentSelectedUserVerified = !!data.isVerified;
-          badgeEl.style.display = currentSelectedUserVerified ? 'inline' : 'none';
+          badgeEl.style.display = currentSelectedUserVerified ? 'inline-block' : 'none';
 
           if (isSelf) {
             if (subBtnContainer) subBtnContainer.style.display = 'none';
@@ -792,7 +795,7 @@
     <button id="crash-btn" onclick="triggerAdminCrash()" class="btn btn-red" style="display: none; margin-left: 8px;">Simulate Crash</button>
   </nav>
 
-  <!-- 👑 Global Admin God Mode Studio Panel -->
+  <!-- Global Admin God Mode Studio Panel -->
   <div id="global-admin-panel" class="card-panel" style="display: none; border: 2px dashed #ffd700; background: #1a1800;">
     <h2 style="color: #ffd700; display: flex; align-items: center; gap: 8px;">👑 StreamKids V5 Global God Mode Studio</h2>
     <p style="color: #ccc; margin-bottom: 12px; font-size: 0.9rem;">Global overrides apply instantly across all connected user sessions worldwide.</p>
@@ -927,7 +930,7 @@
     </div>
   </div>
 
-  <!-- 🎨 OBS Studio Overlay Creator & Controller Tab -->
+  <!-- OBS Studio Overlay Creator & Controller Tab -->
   <div id="obs-studio-tab" class="tab-content" style="display: none;">
     <div class="card-panel">
       <h2>📺 OBS Stream Overlay Studio</h2>
@@ -1043,7 +1046,7 @@
 
         <h2 style="display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 5px;">
           <span id="profile-modal-name">Username</span>
-          <span id="profile-modal-badge" class="badge-icon" style="display: none;" title="Verified Creator">☑️</span>
+          <img id="profile-modal-badge" src="verified-badge.png" class="verified-badge" style="display: none;" title="Verified Creator" alt="Verified">
         </h2>
         <p id="profile-modal-email" style="color: #888; font-size: 0.85rem; margin-top: 2px;"></p>
 
@@ -1054,7 +1057,7 @@
           👥 <span id="profile-modal-subs">0</span> Subscribers
         </p>
 
-        <!-- 🪙 Star Coin & Pet Display Widget -->
+        <!-- Star Coin & Pet Display Widget -->
         <div style="background: #121212; padding: 10px; border-radius: 6px; margin: 10px 0; border: 1px solid var(--border-color); display: flex; justify-content: space-around; align-items: center;">
           <div>
             <span style="font-size: 0.8rem; color: #aaa; display: block;">Wallet</span>
@@ -1073,7 +1076,7 @@
           </button>
         </div>
 
-        <!-- 🎁 V5 Package Code Redemption Box (Visible on own profile) -->
+        <!-- V5 Package Code Redemption Box -->
         <div id="package-redemption-box" style="display: none; background: #121212; padding: 12px; border-radius: 6px; margin-top: 15px; border: 1px dashed #0088ff; text-align: left;">
           <p style="font-size: 0.85rem; color: #0088ff; margin-bottom: 6px; font-weight: bold;">🎁 Redeem Package Code</p>
           <p style="color: #aaa; font-size: 0.75rem; margin-bottom: 8px;">Enter code purchased from StreamKids-Hub:</p>
@@ -1083,7 +1086,7 @@
           </div>
         </div>
 
-        <!-- 🎨 V5 Theme & Package Switcher (Visible on own profile) -->
+        <!-- V5 Theme & Package Switcher -->
         <div id="theme-switcher-box" style="display: none; background: #121212; padding: 12px; border-radius: 6px; margin-top: 12px; border: 1px solid #333; text-align: left;">
           <p style="font-size: 0.85rem; color: #00ffcc; margin-bottom: 6px; font-weight: bold;">🎨 Theme & Package Switcher</p>
           <select id="theme-package-select" class="dark-input full-width" style="font-size: 0.8rem; padding: 6px;" onchange="switchUserActiveTheme(this.value)">
@@ -1093,7 +1096,7 @@
           </select>
         </div>
 
-        <!-- 🛒 YouTube Emoji Cat Shop & Management Box -->
+        <!-- YouTube Emoji Cat Shop & Management Box -->
         <div id="pet-shop-box" style="display: none; background: #121212; padding: 12px; border-radius: 6px; margin-top: 12px; border: 1px dashed #ffd700; text-align: left;">
           <p style="font-size: 0.85rem; color: #ffd700; margin-bottom: 6px; font-weight: bold;">🐱 YouTube Emoji Cat Breeds</p>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px;">
@@ -1143,7 +1146,7 @@
     </div>
   </div>
 
-  <!-- 🐾 Living Companion Pet Container (YouTube Emoji Cat Style) -->
+  <!-- Living Companion Pet Container -->
   <div id="living-pet-container" onclick="interactWithPet()" title="Click your cat!" style="position: fixed; bottom: 20px; right: 20px; z-index: 8000; cursor: pointer; user-select: none; text-align: center; transition: transform 0.2s ease;">
     <div id="pet-speech-bubble" style="background: rgba(0,0,0,0.85); color: #00ffcc; font-size: 0.75rem; padding: 5px 10px; border-radius: 12px; margin-bottom: 6px; white-space: nowrap; display: none; border: 1px solid #00ffcc; font-weight: bold;">Meow! 🐾</div>
     
@@ -1184,7 +1187,7 @@
     </button>
   </div>
 
-  <!-- 🌅 Pixel Sunset Background Music Engine -->
+  <!-- Pixel Sunset Background Music Engine -->
   <audio id="bg-music" src="Pixel Sunset.mp3" preload="auto" loop></audio>
 
 </body>
