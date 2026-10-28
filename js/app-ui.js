@@ -161,6 +161,39 @@ async function grantVerificationWithRules(targetUid) {
   }
 }
 
+// Admin function to revoke verified status from a target user
+async function revokeVerification(targetUid) {
+  const isAdmin = checkIsAdmin();
+  if (!isAdmin) {
+    alert("Access Denied: Only primary administrators can revoke verification!");
+    return;
+  }
+
+  if (!targetUid || !targetUid.trim()) {
+    alert("Invalid User UID provided.");
+    return;
+  }
+
+  const cleanUid = targetUid.trim();
+  const db = firebase.firestore();
+
+  try {
+    await db.collection('users').doc(cleanUid).set({
+      isVerified: false,
+      isOwnerVerified: false
+    }, { merge: true });
+
+    alert(`Successfully revoked verified status from user UID: ${cleanUid}`);
+    
+    if (typeof currentSelectedUid !== 'undefined' && currentSelectedUid === cleanUid) {
+      openChannelProfile(cleanUid);
+    }
+  } catch (err) {
+    console.error("Failed to revoke verification:", err);
+    alert("Error: " + err.message);
+  }
+}
+
 // Grant Owner Verified Package (Primary Admin Only)
 async function grantOwnerVerifiedPackage(targetUid) {
   if (!checkIsAdmin()) {
@@ -1564,6 +1597,7 @@ window.redeemKidPackageCode = redeemKidPackageCode;
 window.switchUserActiveTheme = switchUserActiveTheme;
 window.loadAndApplyUserTheme = loadAndApplyUserTheme;
 window.grantVerificationWithRules = grantVerificationWithRules;
+window.revokeVerification = revokeVerification;
 window.grantOwnerVerifiedPackage = grantOwnerVerifiedPackage;
 window.adminGrantStarCoins = adminGrantStarCoins;
 window.addStarCoins = addStarCoins;
