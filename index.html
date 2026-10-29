@@ -643,9 +643,15 @@
       currentSelectedUid = null;
     }
 
+    // ✅ FIXED: Dynamically handles granting or revoking based on verification state
     function toggleUserVerification() {
       if (!currentSelectedUid) return;
-      grantVerificationWithRules(currentSelectedUid);
+      
+      if (currentSelectedUserVerified) {
+        revokeVerification(currentSelectedUid);
+      } else {
+        grantVerificationWithRules(currentSelectedUid);
+      }
     }
 
     function openMyProfile() {
