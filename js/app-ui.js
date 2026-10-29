@@ -184,13 +184,43 @@ async function revokeVerification(targetUid) {
     }, { merge: true });
 
     alert(`Successfully revoked verified status from user UID: ${cleanUid}`);
-    
-    if (typeof currentSelectedUid !== 'undefined' && currentSelectedUid === cleanUid) {
-      openChannelProfile(cleanUid);
-    }
   } catch (err) {
     console.error("Failed to revoke verification:", err);
     alert("Error: " + err.message);
+  }
+}
+
+// 🔄 DYNAMIC ADMIN VERIFY TOGGLE HANDLER
+async function handleAdminVerifyToggle(targetUid) {
+  if (!targetUid || !targetUid.trim()) {
+    targetUid = prompt("Enter Target User UID:");
+    if (!targetUid) return;
+  }
+
+  const cleanUid = targetUid.trim();
+  const db = firebase.firestore();
+
+  try {
+    const userDoc = await db.collection('users').doc(cleanUid).get();
+    if (!userDoc.exists) {
+      alert("Target user profile not found!");
+      return;
+    }
+
+    const isVerified = userDoc.data().isVerified || false;
+
+    if (isVerified) {
+      await revokeVerification(cleanUid);
+    } else {
+      await grantVerificationWithRules(cleanUid);
+    }
+
+    if (typeof openChannelProfile === 'function') {
+      openChannelProfile(cleanUid);
+    }
+  } catch (err) {
+    console.error("Error in admin verify toggle:", err);
+    alert("Toggle action failed: " + err.message);
   }
 }
 
@@ -294,7 +324,7 @@ async function adminGrantStarCoins(targetUid, amount) {
 
     alert(`👑 [GOD MODE] Successfully granted ${amount} Star Coins to user UID: ${cleanUid}!`);
     
-    if (typeof currentSelectedUid !== 'undefined' && currentSelectedUid === cleanUid) {
+    if (typeof openChannelProfile === 'function') {
       openChannelProfile(cleanUid);
     }
   } catch (err) {
@@ -360,7 +390,9 @@ async function buyStreamPet(petName, cost) {
     alert(`🎉 Success! You adopted ${petName} as your new companion pet!`);
     
     updateActivePetDisplay(petName);
-    openChannelProfile(user.uid);
+    if (typeof openChannelProfile === 'function') {
+      openChannelProfile(user.uid);
+    }
   } catch (err) {
     alert(err.message);
   }
@@ -393,7 +425,6 @@ async function sendSuperGift(giftName, coinCost) {
       });
     });
 
-    // Broadcast gift blast to chat / live overlay
     alert(`🎁 Successfully sent ${giftName} for ${coinCost} Star Coins! 🎉✨`);
   } catch (err) {
     alert(err.message);
@@ -430,11 +461,9 @@ window.addEventListener('DOMContentLoaded', () => {
     startPetBehaviorLoop();
   }, 1000);
 
-  // Initialize OBS Studio Overlay Link on Load
   generateObsBrowserLink();
 });
 
-// Automatically update OBS link as soon as Firebase login state finishes loading
 firebase.auth().onAuthStateChanged((user) => {
   generateObsBrowserLink();
 });
@@ -798,7 +827,9 @@ async function redeemKidPackageCode() {
     inputEl.value = '';
     
     loadAndApplyUserTheme(user.uid);
-    openChannelProfile(user.uid);
+    if (typeof openChannelProfile === 'function') {
+      openChannelProfile(user.uid);
+    }
   } catch (err) {
     console.error("Redemption failed:", err);
     alert(err.message);
@@ -1125,7 +1156,7 @@ function renderFYPList(videos) {
     card.innerHTML = `
       <h3 style="color: #00ffcc; margin-bottom: 4px;">${escapeHtml(data.title || 'Untitled')}</h3>
       <p style="color: #aaaaaa; font-size: 0.9rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-        Posted by <span onclick="event.stopPropagation(); openChannelProfile('${uploaderUid}')" style="color: #0088ff; cursor: pointer; font-weight: bold;">@${escapeHtml(authorName)}</span>
+        Posted by <span onclick="event.stopPropagation(); if(typeof openChannelProfile==='function') openChannelProfile('${uploaderUid}')" style="color: #0088ff; cursor: pointer; font-weight: bold;">@${escapeHtml(authorName)}</span>
         ${isOwnerUploader ? `<span style="background: linear-gradient(90deg, #ff0000, #ff8800); color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px;">🔨 OWNER VERIFIED</span>` : ''}
         ${isStarUploader && !isOwnerUploader ? `<span style="background: linear-gradient(90deg, #0088ff, #00ffcc); color: #000; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 8px;">⭐ STAR CREATOR</span>` : ''}
       </p>
@@ -1179,13 +1210,13 @@ function filterFYPFeed() {
 }
 
 function playThumbnailVideo(videoId, ytId) {
-  pauseMusicForMedia(); // 🎵 Pauses Pixel Sunset immediately when video starts!
+  pauseMusicForMedia();
 
   const container = document.getElementById(`media-container-${videoId}`);
   const closeBtn = document.getElementById(`close-video-btn-${videoId}`);
   if (!container) return;
 
-  if (closeBtn) closeBtn.style.display = 'inline-block'; // Show close button below video
+  if (closeBtn) closeBtn.style.display = 'inline-block';
 
   container.innerHTML = `
     <iframe 
@@ -1204,11 +1235,10 @@ function closeThumbnailVideo(videoId, ytId) {
   const closeBtn = document.getElementById(`close-video-btn-${videoId}`);
   if (!container) return;
 
-  if (closeBtn) closeBtn.style.display = 'none'; // Hide close button when closed
+  if (closeBtn) closeBtn.style.display = 'none';
 
   const thumbUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
 
-  // Restore thumbnail layout
   container.innerHTML = `
     <img src="${thumbUrl}" alt="Video Thumbnail" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://via.placeholder.com/480x360?text=StreamKids+Video'" />
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border-radius: 50%; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; border: 2px solid #fff;">
@@ -1216,7 +1246,6 @@ function closeThumbnailVideo(videoId, ytId) {
     </div>
   `;
 
-  // Resume background music instantly!
   resumeMusicForMedia();
 }
 
@@ -1425,7 +1454,9 @@ async function editChannelName() {
     const navName = document.getElementById('user-name');
     if (navName) navName.innerText = cleanName;
 
-    openChannelProfile(currentUser.uid);
+    if (typeof openChannelProfile === 'function') {
+      openChannelProfile(currentUser.uid);
+    }
     alert("Channel name updated successfully!");
   } catch (err) {
     console.error("Failed to update channel name:", err);
@@ -1598,6 +1629,7 @@ window.switchUserActiveTheme = switchUserActiveTheme;
 window.loadAndApplyUserTheme = loadAndApplyUserTheme;
 window.grantVerificationWithRules = grantVerificationWithRules;
 window.revokeVerification = revokeVerification;
+window.handleAdminVerifyToggle = handleAdminVerifyToggle;
 window.grantOwnerVerifiedPackage = grantOwnerVerifiedPackage;
 window.adminGrantStarCoins = adminGrantStarCoins;
 window.addStarCoins = addStarCoins;
