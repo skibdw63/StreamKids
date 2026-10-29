@@ -399,9 +399,9 @@ async function buyStreamPet(petName, cost) {
 }
 
 // ==========================================
-// 💬 COMMUNITY POSTS SYSTEM
+// 💬 COMMUNITY POSTS SYSTEM (Base64 No-CORS)
 // ==========================================
-let selectedPostImageFile = null;
+let selectedPostImageBase64 = null;
 
 // Track when user selects an image from desktop for community posts
 function handlePostImageSelect(event) {
@@ -409,15 +409,19 @@ function handlePostImageSelect(event) {
   const nameLabel = document.getElementById('post-selected-file-name');
   
   if (file) {
-    selectedPostImageFile = file;
-    if (nameLabel) nameLabel.innerText = file.name;
+    const reader = new FileReader();
+    reader.onload = function(uploadEvent) {
+      selectedPostImageBase64 = uploadEvent.target.result;
+      if (nameLabel) nameLabel.innerText = file.name;
+    };
+    reader.readAsDataURL(file);
   } else {
-    selectedPostImageFile = null;
+    selectedPostImageBase64 = null;
     if (nameLabel) nameLabel.innerText = "No image selected";
   }
 }
 
-// Publish community post with optional desktop image file upload
+// Publish community post with Base64 image directly to Firestore
 async function publishCreatorPostWithFile(event) {
   const user = firebase.auth().currentUser;
   if (!user) {
@@ -428,7 +432,7 @@ async function publishCreatorPostWithFile(event) {
   const contentInput = document.getElementById('post-content-input');
   const content = contentInput ? contentInput.value.trim() : '';
 
-  if (!content && !selectedPostImageFile) {
+  if (!content && !selectedPostImageBase64) {
     alert("Please write something or attach an image file from your computer!");
     return;
   }
@@ -437,20 +441,11 @@ async function publishCreatorPostWithFile(event) {
   if (publishBtn) publishBtn.innerText = "Publishing...";
 
   try {
-    let imageUrl = '';
-
-    // If an image file was uploaded from desktop, store it in Firebase Storage
-    if (selectedPostImageFile) {
-      const storageRef = firebase.storage().ref(`post_images/${user.uid}_${Date.now()}_${selectedPostImageFile.name}`);
-      const uploadTask = await storageRef.put(selectedPostImageFile);
-      imageUrl = await uploadTask.ref.getDownloadURL();
-    }
-
     // Fetch user profile info
     const userDoc = await firebase.firestore().collection('users').doc(user.uid).get();
     const userData = userDoc.exists ? userDoc.data() : {};
 
-    // Save post to Firestore collection
+    // Save post directly to Firestore collection with Base64 image
     await firebase.firestore().collection('posts').add({
       authorUid: user.uid,
       authorName: userData.displayName || user.displayName || 'Creator',
@@ -458,7 +453,7 @@ async function publishCreatorPostWithFile(event) {
       isVerified: !!userData.isVerified,
       isOwnerVerified: !!userData.isOwnerVerified,
       content: content,
-      imageUrl: imageUrl,
+      imageUrl: selectedPostImageBase64 || '',
       likesCount: 0,
       likedBy: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -466,8 +461,9 @@ async function publishCreatorPostWithFile(event) {
 
     // Reset input fields
     if (contentInput) contentInput.value = '';
-    selectedPostImageFile = null;
-    document.getElementById('post-image-file-input').value = '';
+    selectedPostImageBase64 = null;
+    const fileInput = document.getElementById('post-image-file-input');
+    if (fileInput) fileInput.value = '';
     const nameLabel = document.getElementById('post-selected-file-name');
     if (nameLabel) nameLabel.innerText = "No image selected";
 
