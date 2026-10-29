@@ -464,6 +464,7 @@
     const ADMIN_EMAIL = 'skibidiw63@gmail.com';
     let currentSelectedUid = null;
     let currentSelectedUserVerified = false;
+    let selectedPostImageFile = null;
 
     // Triggered on Form Submit
     function handleKidUploadSubmit() {
@@ -533,6 +534,168 @@
         .catch((err) => alert("Error resolving crash: " + err.message));
       } else {
         location.reload();
+      }
+    }
+
+    // Track when user selects an image from desktop for community posts
+    function handlePostImageSelect(event) {
+      const file = event.target.files[0];
+      const nameLabel = document.getElementById('post-selected-file-name');
+      
+      if (file) {
+        selectedPostImageFile = file;
+        if (nameLabel) nameLabel.innerText = file.name;
+      } else {
+        selectedPostImageFile = null;
+        if (nameLabel) nameLabel.innerText = "No image selected";
+      }
+    }
+
+    // Publish community post with optional desktop image file upload
+    async function publishCreatorPostWithFile(event) {
+      const user = firebase.auth().currentUser;
+      if (!user) {
+        alert("Please log in with Google to create a post!");
+        return;
+      }
+
+      const contentInput = document.getElementById('post-content-input');
+      const content = contentInput ? contentInput.value.trim() : '';
+
+      if (!content && !selectedPostImageFile) {
+        alert("Please write something or attach an image file from your computer!");
+        return;
+      }
+
+      const publishBtn = event ? event.target : null;
+      if (publishBtn) publishBtn.innerText = "Publishing...";
+
+      try {
+        let imageUrl = '';
+
+        // If an image file was uploaded from desktop, store it in Firebase Storage
+        if (selectedPostImageFile) {
+          const storageRef = firebase.storage().ref(`post_images/${user.uid}_${Date.now()}_${selectedPostImageFile.name}`);
+          const uploadTask = await storageRef.put(selectedPostImageFile);
+          imageUrl = await uploadTask.ref.getDownloadURL();
+        }
+
+        // Fetch user profile info
+        const userDoc = await firebase.firestore().collection('users').doc(user.uid).get();
+        const userData = userDoc.exists ? userDoc.data() : {};
+
+        // Save post to Firestore collection
+        await firebase.firestore().collection('posts').add({
+          authorUid: user.uid,
+          authorName: userData.displayName || user.displayName || 'Creator',
+          authorAvatar: userData.avatarUrl || userData.photoURL || user.photoURL || 'https://via.placeholder.com/40',
+          isVerified: !!userData.isVerified,
+          isOwnerVerified: !!userData.isOwnerVerified,
+          content: content,
+          imageUrl: imageUrl,
+          likesCount: 0,
+          likedBy: [],
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Reset input fields
+        if (contentInput) contentInput.value = '';
+        selectedPostImageFile = null;
+        document.getElementById('post-image-file-input').value = '';
+        const nameLabel = document.getElementById('post-selected-file-name');
+        if (nameLabel) nameLabel.innerText = "No image selected";
+
+        alert("🎉 Post published to community!");
+      } catch (err) {
+        console.error("Failed to publish post:", err);
+        alert("Error publishing post: " + err.message);
+      } finally {
+        if (publishBtn) publishBtn.innerText = "Publish Post";
+      }
+    }
+
+    // Real-time Community Posts Feed Loader
+    function initCommunityPostsFeed() {
+      const postsFeedContainer = document.getElementById('community-posts-feed');
+      if (!postsFeedContainer) return;
+
+      firebase.firestore().collection('posts')
+        .orderBy('createdAt', 'desc')
+        .onSnapshot(snapshot => {
+          if (snapshot.empty) {
+            postsFeedContainer.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">No community posts yet. Be the first to publish one!</p>';
+            return;
+          }
+
+          let html = '';
+          snapshot.forEach(doc => {
+            const post = doc.data();
+            const postId = doc.id;
+            const formattedDate = post.createdAt ? new Date(post.createdAt.toDate()).toLocaleString() : 'Just now';
+
+            const verifiedBadge = post.isVerified ? '<img src="verified-badge.png" class="verified-badge" title="Verified Creator" alt="Verified">' : '';
+
+            html += `
+              <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                  <img src="${post.authorAvatar}" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; cursor: pointer;" onclick="openChannelProfile('${post.authorUid}')">
+                  <div>
+                    <div style="font-weight: bold; font-size: 0.95rem; cursor: pointer; color: #0088ff;" onclick="openChannelProfile('${post.authorUid}')">
+                      ${post.authorName} ${verifiedBadge}
+                    </div>
+                    <div style="font-size: 0.75rem; color: #777;">${formattedDate}</div>
+                  </div>
+                </div>
+
+                ${post.content ? `<p style="font-size: 0.95rem; color: #eee; margin-bottom: 10px; white-space: pre-wrap; line-height: 1.4;">${post.content}</p>` : ''}
+                
+                ${post.imageUrl ? `<img src="${post.imageUrl}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 6px; margin-bottom: 10px; border: 1px solid #333;">` : ''}
+
+                <div style="display: flex; align-items: center; gap: 15px; margin-top: 5px;">
+                  <button onclick="toggleLikePost('${postId}')" class="btn btn-gray" style="font-size: 0.8rem; padding: 4px 10px; background: #2a2a2a; color: #ffd700;">
+                    ❤️ ${post.likesCount || 0} Likes
+                  </button>
+                </div>
+              </div>
+            `;
+          });
+
+          postsFeedContainer.innerHTML = html;
+        }, err => {
+          console.error("Error loading posts feed:", err);
+        });
+    }
+
+    // Toggle Post Likes
+    async function toggleLikePost(postId) {
+      const user = firebase.auth().currentUser;
+      if (!user) {
+        alert("Log in to like posts!");
+        return;
+      }
+
+      const postRef = firebase.firestore().collection('posts').doc(postId);
+      try {
+        const doc = await postRef.get();
+        if (!doc.exists) return;
+
+        const data = doc.data();
+        const likedBy = data.likedBy || [];
+        const hasLiked = likedBy.includes(user.uid);
+
+        if (hasLiked) {
+          await postRef.update({
+            likesCount: firebase.firestore.FieldValue.increment(-1),
+            likedBy: firebase.firestore.FieldValue.arrayRemove(user.uid)
+          });
+        } else {
+          await postRef.update({
+            likesCount: firebase.firestore.FieldValue.increment(1),
+            likedBy: firebase.firestore.FieldValue.arrayUnion(user.uid)
+          });
+        }
+      } catch (err) {
+        console.error("Failed to update like:", err);
       }
     }
 
@@ -643,7 +806,7 @@
       currentSelectedUid = null;
     }
 
-    // ✅ FIXED: Dynamically handles granting or revoking based on verification state
+    // Dynamically handles granting or revoking based on verification state
     function toggleUserVerification() {
       if (!currentSelectedUid) return;
       
@@ -664,6 +827,7 @@
     // Application Initialization
     window.addEventListener('DOMContentLoaded', () => {
       const db = firebase.firestore();
+      initCommunityPostsFeed();
 
       db.collection('system').doc('status').onSnapshot((doc) => {
         const crashOverlay = document.getElementById('crash-screen');
@@ -791,6 +955,7 @@
   <!-- Top Navigation Bar -->
   <nav class="main-nav">
     <button onclick="showTab('feed')" class="nav-btn">Live Feed</button>
+    <button onclick="showTab('posts-tab')" class="nav-btn" style="border-color: #0088ff; color: #0088ff;">💬 Community Posts</button>
     <button onclick="showTab('upload-tab')" class="nav-btn">Upload Video</button>
     <button onclick="showTab('fyp-tab')" class="nav-btn">For You</button>
     <button onclick="showTab('schedule')" class="nav-btn">Schedule</button>
@@ -862,6 +1027,38 @@
             <button onclick="sendChatMessage()" class="btn btn-gray">Send</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dedicated Community Posts Tab Section -->
+  <div id="posts-tab" class="tab-content" style="display: none;">
+    <div class="card-panel" style="max-width: 650px; margin: 0 auto;">
+      <h2 style="color: #0088ff; display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">💬 Community Posts & Updates</h2>
+
+      <!-- Creator Post Box -->
+      <div style="background: var(--bg-primary); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 25px;">
+        <h3 style="color: #00ffcc; font-size: 1rem; margin-bottom: 10px;">✍️ Create a Post</h3>
+        
+        <textarea id="post-content-input" placeholder="What's happening in your streams or games?" class="dark-input full-width" style="height: 90px; margin-bottom: 12px; font-family: inherit; resize: vertical;" aria-label="Post Content"></textarea>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <!-- Hidden file input for desktop images -->
+          <input type="file" id="post-image-file-input" accept="image/*" style="display: none;" onchange="handlePostImageSelect(event)">
+          
+          <button onclick="document.getElementById('post-image-file-input').click()" class="btn btn-gray" style="font-size: 0.85rem;">
+            📷 Attach Image from Desktop
+          </button>
+          
+          <span id="post-selected-file-name" style="font-size: 0.8rem; color: #00ffcc;">No image selected</span>
+          
+          <button onclick="publishCreatorPostWithFile(event)" class="btn btn-green">Publish Post</button>
+        </div>
+      </div>
+
+      <!-- Live Posts Feed -->
+      <div id="community-posts-feed" style="display: flex; flex-direction: column; gap: 15px;">
+        <p style="color: #aaa; text-align: center;">Loading community posts...</p>
       </div>
     </div>
   </div>
